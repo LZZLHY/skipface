@@ -1,0 +1,26 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#000000" },
+
+    { "name": "brand", "value": "#7C8AFF" },
+    { "name": "brand_soft", "value": "#23264D" },
+    { "name": "brand_deep", "value": "#AAB4FF" },
+    { "name": "on_brand", "value": "#0E0F12" },
+
+    { "name": "bg", "value": "#121316" },
+    { "name": "surface", "value": "#1E2024" },
+    { "name": "surface_2", "value": "#2A2D32" },
+
+    { "name": "text_primary", "value": "#ECECEC" },
+    { "name": "text_secondary", "value": "#9AA0A8" },
+    { "name": "text_tertiary", "value": "#6A7078" },
+
+    { "name": "divider", "value": "#2A2D32" },
+    { "name": "accent", "value": "#2BD080" },
+    { "name": "danger", "value": "#FF6257" },
+    { "name": "danger_soft", "value": "#3A1F1E" },
+
+    { "name": "scrim", "value": "#99000000" },
+    { "name": "editor_canvas", "value": "#121316" }
+  ]
+}

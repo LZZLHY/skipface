@@ -1,0 +1,46 @@
+{
+  "app": {
+    // 签名配置不入库：包含证书/密钥与密码等敏感信息。
+    // 首次在 DevEco Studio 打开本工程时，请在
+    // File > Project Structure > Signing Configs 勾选 "Automatically generate signature"
+    // 自动生成调试签名，DevEco 会把签名信息写回本机的 build-profile.json5（已用
+    // skip-worktree 标记，本地改动不会被 Git 跟踪/误提交）。
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "compatibleSdkVersion": "6.1.0(23)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        },
+        "targetSdkVersion": "26.0.0"
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "skipfaceapp",
+      "srcPath": "./skipface",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

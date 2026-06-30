@@ -1,0 +1,64 @@
+{
+  "module": {
+    "name": "skipfaceapp",
+    "type": "entry",
+    "description": "$string:module_desc",
+    "mainElement": "SkipfaceAbility",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [
+      {
+        "name": "SkipfaceAbility",
+        "srcEntry": "./ets/skipfaceability/SkipfaceAbility.ets",
+        "description": "$string:SkipfaceAbility_desc",
+        "icon": "$media:layered_image",
+        "label": "$string:SkipfaceAbility_label",
+        "startWindowIcon": "$media:startIcon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "ohos.want.action.home"
+            ]
+          },
+          {
+            "actions": [
+              "ohos.want.action.viewData",
+              "ohos.want.action.sendData"
+            ],
+            "uris": [
+              {
+                "scheme": "file",
+                "type": "image/*"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "SkipfaceBackupAbility",
+        "srcEntry": "./ets/skipfacebackupability/SkipfaceBackupAbility.ets",
+        "type": "backup",
+        "exported": false,
+        "metadata": [
+          {
+            "name": "ohos.extension.backup",
+            "resource": "$profile:backup_config"
+          }
+        ],
+      }
+    ]
+  }
+}
