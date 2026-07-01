@@ -12,9 +12,10 @@ import { image } from '@kit.ImageKit';
 import { common } from '@kit.AbilityKit';
 import { AppContainer } from '../common/di/AppContainer';
 import { LoadedImage } from '../domain/model/LoadedImage';
-import { FaceDetection } from '../domain/model/FaceDetection';
+import { FaceDetection, FaceLandmarks } from '../domain/model/FaceDetection';
 import { EmojiMask, BlurMask } from '../domain/model/Mask';
-import { RectF } from '../domain/model/Geometry';
+import { RectF, PointF } from '../domain/model/Geometry';
+import { ProxyDecodeResult } from '../data/photo/PhotoRepository';
 import { MaskKind, BlurEffect, BlurTarget } from '../domain/model/MaskEnums';
 import { ExportRequest } from '../capability/imaging/ImageExporter';
 import { Result } from '../common/base/Result';
@@ -107,20 +108,78 @@ export class EditorViewModel {
     this.loaded = loadRes.value;
     this.aspectRatio = loadRes.value.aspectRatio;
 
-    const detRes: Result<FaceDetection[]> = await this.container.detectFaces.execute(loadRes.value.proxy);
-    if (!detRes.ok || !detRes.value) {
+    // 在高分辨率检测图上检测(人群/毕业照小脸召回)，坐标已映射回代理图空间。
+    const detected: FaceDetection[] | null = await this.detectOnHiRes(uri, loadRes.value);
+    if (detected === null) {
       this.isProcessing = false;
       // 检测器内部已对"模型不可用"优雅降级为返回空；走到这里说明发生了意外错误。
       this.toast = 'msg_model_failed';
-      Logger.error(EditorViewModel.TAG, 'detect failed', detRes.error);
       return;
     }
-    this.detections = detRes.value;
+    this.detections = detected;
     this.rebuildMasksForCurrentMode();
     if (this.detections.length === 0) {
       this.toast = 'msg_no_face';
     }
     this.isProcessing = false;
+  }
+
+  /**
+   * 在高分辨率检测图上执行人脸检测，并把结果坐标映射回代理图空间。
+   * 目的：人群/毕业照中人脸在 1024 代理图上过小会被系统检测器漏检。
+   * @returns 代理图坐标系下的检测结果；发生意外错误返回 null(与"降级空列表"区分)。
+   */
+  private async detectOnHiRes(uri: string, loaded: LoadedImage): Promise<FaceDetection[] | null> {
+    // 代理图已足够大(原图较小)：直接用代理图检测，避免重复解码。
+    const proxyLong: number = Math.max(loaded.proxyWidth, loaded.proxyHeight);
+    if (proxyLong >= AppConstants.DETECT_MAX_SIDE) {
+      const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(loaded.proxy);
+      if (!r.ok || !r.value) {
+        Logger.error(EditorViewModel.TAG, 'detect failed', r.error);
+        return null;
+      }
+      return r.value;
+    }
+
+    let detImg: image.PixelMap | null = null;
+    try {
+      const dec: ProxyDecodeResult =
+        await this.container.photoRepo.decodeProxy(uri, AppConstants.DETECT_MAX_SIDE);
+      detImg = dec.proxy;
+      const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(detImg);
+      if (!r.ok || !r.value) {
+        Logger.error(EditorViewModel.TAG, 'detect failed', r.error);
+        return null;
+      }
+      // 检测图 → 代理图 的等比缩放系数(两者同源、保比)。
+      const k: number = dec.proxyWidth > 0 ? loaded.proxyWidth / dec.proxyWidth : 1;
+      if (Math.abs(k - 1) < 1e-3) {
+        return r.value;
+      }
+      return r.value.map((d: FaceDetection): FaceDetection => EditorViewModel.scaleDetection(d, k));
+    } catch (e) {
+      Logger.error(EditorViewModel.TAG, 'hi-res detect failed', e as Error);
+      return null;
+    } finally {
+      // 检测图仅用于检测，用后立即释放，避免大图原生内存停留。
+      if (detImg) {
+        EditorViewModel.safeRelease(detImg);
+      }
+    }
+  }
+
+  /** 按比例缩放一次检测结果的框与关键点(检测图坐标 → 代理图坐标)。 */
+  private static scaleDetection(d: FaceDetection, f: number): FaceDetection {
+    const box: RectF = d.box.scaled(f);
+    const l: FaceLandmarks = d.landmarks;
+    const lm: FaceLandmarks = new FaceLandmarks(
+      new PointF(l.leftEye.x * f, l.leftEye.y * f),
+      new PointF(l.rightEye.x * f, l.rightEye.y * f),
+      new PointF(l.nose.x * f, l.nose.y * f),
+      new PointF(l.mouthLeft.x * f, l.mouthLeft.y * f),
+      new PointF(l.mouthRight.x * f, l.mouthRight.y * f)
+    );
+    return new FaceDetection(d.id, box, lm, d.score);
   }
 
   /** 根据当前模式，由检测结果重建遮挡列表。 */

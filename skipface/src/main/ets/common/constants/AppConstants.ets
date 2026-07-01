@@ -7,12 +7,18 @@
  */
 export class AppConstants {
   /** ====== 检测 ====== */
-  /** 置信度阈值：低于此分数的人脸检测结果被丢弃。 */
-  static readonly SCORE_THRESHOLD: number = 0.45;
+  /** 置信度阈值：低于此分数的人脸检测结果被丢弃。取较低值以提升人群照的召回。 */
+  static readonly SCORE_THRESHOLD: number = 0.3;
 
   /** ====== 图像处理 ====== */
   /** 检测/编辑使用的代理图最大边长（性能与精度平衡）。 */
   static readonly DISPLAY_MAX_SIDE: number = 1024;
+  /**
+   * 人脸检测专用图的最大边长。人群/毕业照中人脸在 1024 代理图上过小(20~30px)会被系统
+   * 检测器漏检；单独解码一张更大的图做检测(用后即释放)，再把坐标按比例映射回代理图空间，
+   * 显著提升多人小脸的召回。编辑仍用小代理图，内存不受影响。
+   */
+  static readonly DETECT_MAX_SIDE: number = 2560;
   /** 新增 Emoji 的默认直径（代理图坐标系，像素）。 */
   static readonly DEFAULT_EMOJI_DIAMETER: number = 100;
   /** 新增模糊区域的默认边长（代理图坐标系，像素）。 */
