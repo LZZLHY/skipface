@@ -193,6 +193,11 @@ export class EditorViewModel {
       dw = Math.max(1, Math.round(rw * f));
       dh = Math.max(1, Math.round(rh * f));
     }
+    // 子块过小(短边低于系统最小输入)则跳过：避免 "parameter check failed" 空耗预算。
+    // 顶层整图(depth=0)不跳过，保证极小图片也至少检测一次。
+    if (depth > 0 && Math.min(dw, dh) < AppConstants.DETECT_MIN_INPUT) {
+      return;
+    }
 
     budget.calls++;
     let faces: FaceDetection[] = [];

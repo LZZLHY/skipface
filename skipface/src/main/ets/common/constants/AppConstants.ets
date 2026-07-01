@@ -8,7 +8,7 @@
 export class AppConstants {
   /** ====== 检测 ====== */
   /** 置信度阈值：低于此分数的人脸检测结果被丢弃。取较低值以提升人群照的召回。 */
-  static readonly SCORE_THRESHOLD: number = 0.3;
+  static readonly SCORE_THRESHOLD: number = 0.25;
 
   /** ====== 图像处理 ====== */
   /** 检测/编辑使用的代理图最大边长（性能与精度平衡）。 */
@@ -18,15 +18,20 @@ export class AppConstants {
    * 若一次调用返回数达到该阈值，说明结果被截断，则把该区域切成带重叠的四块分别再检测，
    * 反复细分直到某块不足阈值，最后合并 + NMS 去重，用"多次调用"突破"单次数量上限"。
    */
-  static readonly DETECT_SUBDIVIDE_THRESHOLD: number = 10;
+  static readonly DETECT_SUBDIVIDE_THRESHOLD: number = 8;
   /** 细分最大深度(整图=0；1→4 块；2→16 块；3→64 块，仅拥挤区域才会展开)。 */
   static readonly DETECT_MAX_DEPTH: number = 3;
-  /** 允许继续细分的最小区域边长(原图像素)，防止把过小区域切碎。 */
-  static readonly DETECT_MIN_SPLIT: number = 320;
+  /** 允许继续细分的最小区域边长(原图像素)：低于此值不再切，避免切出系统拒绝的过小块。 */
+  static readonly DETECT_MIN_SPLIT: number = 400;
+  /**
+   * 系统检测器可接受的最小输入边长(像素)。解码后短边小于此值的块直接跳过检测——
+   * 这类过小块会触发 "parameter check failed" 报错、白白消耗调用预算，且几乎无有效人脸。
+   */
+  static readonly DETECT_MIN_INPUT: number = 256;
   /** 细分时相邻子块的重叠比例，避免骑跨边界的人脸被切断漏检。 */
-  static readonly DETECT_SPLIT_OVERLAP: number = 0.15;
+  static readonly DETECT_SPLIT_OVERLAP: number = 0.3;
   /** 检测调用总次数上限(安全阀，避免极端图片过度细分导致耗时过长)。 */
-  static readonly DETECT_MAX_CALLS: number = 48;
+  static readonly DETECT_MAX_CALLS: number = 80;
   /** 单块解码的最大边长(原图像素)：超过则降采样解码，限制内存/耗时。 */
   static readonly DETECT_REGION_MAX: number = 2200;
   /** 分块结果合并去重的 IoU 阈值：重叠超过该值视为同一张脸，保留分数更高者。 */
