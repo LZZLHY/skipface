@@ -5,9 +5,7 @@
   "main": "",
   "author": "",
   "license": "",
-  "dependencies": {
-    "@ohos/onnxruntime": "^1.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {},
   "dynamicDependencies": {}
 }

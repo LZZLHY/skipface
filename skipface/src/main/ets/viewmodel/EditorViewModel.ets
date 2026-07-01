@@ -518,12 +518,12 @@ export class EditorViewModel {
   /**
    * 释放当前图片占用的原生 PixelMap 资源。页面销毁(aboutToDisappear)时调用，
    * 避免全分辨率原图等原生内存在多次进出编辑器后累积，导致再次解码大图时 OOM 崩溃。
-   * 注意：导出进行中(isExporting)不释放，以免释放正被读取的原图。
+   *
+   * 释放的是"代理显示图"proxy。导出路径不依赖 proxy(它按 uri 另行临时解码全分辨率原图，
+   * 见 buildExportRequest)，故即便导出进行中释放 proxy 也不会影响导出结果；因此这里
+   * 无条件释放，避免"导出中离开页面"时 proxy 泄漏。
    */
   dispose(): void {
-    if (this.isExporting) {
-      return;
-    }
     const l: LoadedImage | null = this.loaded;
     this.loaded = null;
     this.detections = [];

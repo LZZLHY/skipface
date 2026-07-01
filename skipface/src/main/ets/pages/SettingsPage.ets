@@ -17,6 +17,7 @@ import { DEFAULT_FONT_MARKER } from '../data/settings/SettingsRepository';
 import { SegmentedControl, SegItem } from '../components/SegmentedControl';
 import { SettingsSection, SettingRow } from '../components/SettingsWidgets';
 import { SafeAreaModel } from '../common/safearea/SafeAreaModel';
+import { AppConstants } from '../common/constants/AppConstants';
 import { Logger } from '../common/utils/Logger';
 
 @ComponentV2
@@ -250,11 +251,31 @@ export struct SettingsPage {
   aboutContent() {
     SettingRow({ title: $r('app.string.about_version'), valueText: this.vm.appVersion })
     SettingRow({
+      title: $r('app.string.about_github'),
+      subtitle: $r('app.string.about_github_sub'),
+      showChevron: true,
+      showDivider: true,
+      onClickRow: (): void => { this.openGithub(); }
+    })
+    SettingRow({
       title: $r('app.string.about_license'),
       showChevron: true,
       showDivider: true,
       onClickRow: (): void => { this.showLicense(); }
     })
+  }
+
+  /** 在系统浏览器打开开源仓库地址。 */
+  private openGithub(): void {
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    ctx.openLink(AppConstants.GITHUB_URL, { appLinkingOnly: false })
+      .catch((e: Object): void => {
+        Logger.warn('SettingsPage', 'open github failed');
+        this.getUIContext().getPromptAction().showToast({
+          message: this.getUIContext().getHostContext()!.resourceManager.getStringByNameSync('about_open_failed'),
+          duration: 2000
+        });
+      });
   }
 
   /** 展示开源许可与署名(满足 AGPL-3.0 / ONNX Runtime 的署名要求)。 */

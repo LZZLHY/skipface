@@ -67,15 +67,6 @@ export class SettingsViewModel {
   }
 
   /** ====== Emoji 调色板 ====== */
-  /** 用连续 emoji 字符串更新调色板(为空则恢复默认)。 */
-  async updatePaletteFromText(text: string): Promise<void> {
-    const list: string[] = EmojiUtil.split(text);
-    this.emojiPalette = list.length > 0 ? list : this.repo.getEmojiPalette();
-    await this.repo.setEmojiPalette(list);
-    // 重新读取以反映"为空恢复默认"的归一化结果。
-    this.emojiPalette = this.repo.getEmojiPalette();
-  }
-
   /**
    * 把输入文本中的 emoji 追加到调色板末尾(去重)，立即更新内存列表并持久化。
    * 直接改内存数组以保证 UI 即时刷新，不依赖存储回读。

@@ -6,23 +6,9 @@
  *       业务语义的"枚举"放在 domain/model/MaskEnums.ets，避免混淆。
  */
 export class AppConstants {
-  /** ====== 模型与推理 ====== */
-  /** rawfile 中的 ONNX 模型文件名（默认实现，ONNX Runtime 直接加载）。 */
-  static readonly ONNX_MODEL_FILE_NAME: string = 'skipface_face.onnx';
-  /** rawfile 中的 MindSpore Lite 模型文件名（可选实现，需离线转换得到）。 */
-  static readonly MS_MODEL_FILE_NAME: string = 'skipface_face.ms';
-  /** 模型输入边长（letterbox 到 INPUT_SIZE×INPUT_SIZE）。 */
-  static readonly MODEL_INPUT_SIZE: number = 640;
-  /** letterbox 填充使用的中性灰（0~255）。 */
-  static readonly LETTERBOX_PAD_GRAY: number = 114;
-  /** YOLOv8 默认 anchor 数（640 输入下为 8400）。 */
-  static readonly NUM_ANCHORS: number = 8400;
-  /** 置信度阈值：低于此分数的框被丢弃。 */
+  /** ====== 检测 ====== */
+  /** 置信度阈值：低于此分数的人脸检测结果被丢弃。 */
   static readonly SCORE_THRESHOLD: number = 0.45;
-  /** NMS 的 IoU 阈值：高于此重叠度的框被抑制。 */
-  static readonly IOU_THRESHOLD: number = 0.5;
-  /** 关键点数量（左眼/右眼/鼻/左嘴角/右嘴角）。 */
-  static readonly NUM_KEYPOINTS: number = 5;
 
   /** ====== 图像处理 ====== */
   /** 检测/编辑使用的代理图最大边长（性能与精度平衡）。 */
@@ -45,9 +31,9 @@ export class AppConstants {
   /** Preferences 文件名。 */
   static readonly PREF_STORE_NAME: string = 'skipface_settings';
 
-  /** ====== 导出 ====== */
-  /** 相册中保存的相对目录名。 */
-  static readonly ALBUM_FOLDER: string = 'SkipFace';
+  /** ====== 关于 ====== */
+  /** 开源仓库地址（设置页“关于”内点击跳转系统浏览器）。 */
+  static readonly GITHUB_URL: string = 'https://github.com/LZZLHY/skipface';
 
   private constructor() {}
 }

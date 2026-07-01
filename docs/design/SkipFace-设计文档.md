@@ -318,7 +318,7 @@ skipface/src/main/
 ## 12. 可拓展性设计
 
 - **遮挡策略可插拔**：新增效果只需实现 `MaskStrategy` 并在 `MaskRenderer` 注册。
-- **检测器抽象**：`FaceDetector` 接口，`MindSporeFaceDetector` 为默认实现；未来可替换为系统视觉服务或其它模型而不动上层。
+- **检测器抽象**：`FaceDetector` 接口，`CoreVisionFaceDetector`（系统 Core Vision Kit）为默认实现；未来可替换为其它系统能力或自研模型而不动上层。
 - **用例无状态**：领域用例纯函数化，便于复用与单测。
 - **特性模块化**：editor / settings 可演进为独立 HSP，支持按需加载。
 
@@ -517,22 +517,25 @@ export const themePalette = AppStorageV2.connect(ThemePalette, 'theme', () => ne
 
 本节记录代码落地阶段相对前文设计的修订，均为"保证开箱即用且正确"的工程决策。
 
-### 15.1 人脸检测：默认改用 ONNX Runtime + YOLOv8-face（内置权重）
+### 15.1 人脸检测：改用系统 Core Vision Kit（免模型文件，最终落地方案）
 
-- 默认实现由 `OnnxFaceDetector` 提供，基于 OpenHarmony TPC 的 `@ohos/onnxruntime`
-  （ONNX Runtime NAPI 移植），**直接加载 rawfile 内置的 YOLOv8-face 权重
-  `skipface_face.onnx`**，端侧本地推理、开箱即用。与上游 Android 工程一致使用
-  ONNX Runtime + YOLOv8-face 权重，免离线模型转换。
-- 复用统一的 `Letterbox`（640×640 预处理）与 `DetectionDecoder`（解码 + NMS），
-  输出人脸框 + 5 关键点（双眼/鼻/双嘴角），驱动遮挡跟随头部倾斜旋转。
-- 模型契约：输入 `images` `[1,3,640,640]` Float32(CHW, 归一化)，输出 `output0`
-  `[1,20,8400]`（cx,cy,w,h,score + 5 关键点(x,y,conf)）；运行时动态查询输入/输出名。
-- 许可：YOLOv8-face 权重为 Ultralytics **AGPL-3.0**；`@ohos/onnxruntime` 随包提供
-  arm64-v8a 预编译原生库。详见 `resources/rawfile/README.md`。
-- **可选替换实现**保留并可在 `AppContainer.init()` 一行切换：
-  - `CoreVisionFaceDetector`（系统 Core Vision Kit，免模型文件）；
-  - `MindSporeFaceDetector`（系统 MindSpore Lite，需 `converter_lite` 转出 `.ms`）。
-- 设备不支持（非 arm64 无原生库）或推理失败时优雅降级为"无自动检测"，用户仍可手动添加遮挡。
+- 默认且唯一内置实现为 `CoreVisionFaceDetector`，基于 HarmonyOS 系统自带的
+  Core Vision Kit（`@kit.CoreVisionKit` 的 `faceDetector`）：完全本地、离线、**免模型文件**，
+  开箱即用，随系统升级而优化。
+- 系统返回人脸框 + 三维姿态(yaw/pitch/roll)；本实现由"人脸框 + roll"合成 5 个关键点
+  （双眼/鼻/双嘴角），使 Emoji / 模糊遮挡跟随头部倾斜(roll)旋转（合成方式保证
+  `landmarks.eyeAngleDeg == roll`）。
+- 设备不具备系统人脸能力或检测失败时优雅降级为"无自动检测"，用户仍可手动添加遮挡。
+- **为何不再用 ONNX Runtime / YOLOv8-face**：早期曾以 `OnnxFaceDetector`
+  （`@ohos/onnxruntime` NAPI 移植）在应用进程内加载 YOLOv8-face 权重推理，但在
+  真机（如 Mate 70）上多次进出编辑器后，`session.Run` 会在原生层抛出 C++ 异常
+  （`std::length_error`）并逸出 NAPI 边界，直接 abort 整个进程（SIGABRT），
+  ArkTS 的 try/catch 无法拦截。系统视觉服务运行于独立进程，从根本上规避该风险。
+  因此 v1.1 起：移除 `@ohos/onnxruntime` 依赖、移除内置权重与 ONNX/MindSpore/Letterbox/
+  Decoder 相关代码，改以系统能力为唯一实现。
+- **可扩展性未变**：检测器仍以统一的 `FaceDetector` 抽象解耦；如需替换为自研模型或
+  其它系统能力，实现该接口后在 `AppContainer.init()` 一行切换即可，上层与渲染逻辑不变。
+  历史的 letterbox/NMS/解码等算法思路见本文档 §6，可按需自行重建。
 
 ### 15.2 保存到相册：改用 SaveButton 安全控件（免静态权限）
 

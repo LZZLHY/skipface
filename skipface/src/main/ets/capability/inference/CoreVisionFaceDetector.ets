@@ -8,10 +8,10 @@
  *   - detect() = faceDetector.detect(pixelMap) 直接返回人脸框/姿态/关键点；
  *   - release()= faceDetector.release() 释放分析器。
  *
- * 选型理由：YOLOv8-face 的 .ms 模型需离线转换且权重不便随源码分发；系统视觉服务
- *   开箱即用、随系统升级而优化，且满足"隐私优先、纯本地"的产品定位。设计文档
- *   §12 已将"系统视觉服务"列为 FaceDetector 的合法替换实现。若后续需要更强的
- *   关键点能力，可切换回 MindSporeFaceDetector（见同目录实现）。
+ * 选型理由：完全本地、离线、免模型文件，随系统升级而优化，满足"隐私优先、纯本地"的
+ *   产品定位；且系统服务运行于独立进程，不在应用进程内加载第三方原生推理库，规避了
+ *   进程内原生推理崩溃(SIGABRT)的风险。设计文档 §12 已将"系统视觉服务"列为 FaceDetector
+ *   的合法实现。
  *
  * 坐标系：detect 返回的 rect/points 均为传入 PixelMap（即代理显示图）的像素坐标，
  *   与上层编辑坐标系一致，无需额外换算。
@@ -103,7 +103,9 @@ export class CoreVisionFaceDetector implements FaceDetector {
     const result: FaceDetection[] = [];
     for (let i: number = 0; i < faces.length; i++) {
       const f: faceDetector.Face = faces[i];
-      if (f.probability < AppConstants.SCORE_THRESHOLD) {
+      // probability 理论上恒有值；做兜底避免个别机型字段缺失时因 undefined 比较而全量丢弃。
+      const prob: number = typeof f.probability === 'number' ? f.probability : 1;
+      if (prob < AppConstants.SCORE_THRESHOLD) {
         continue;
       }
       const r: faceDetector.FaceRectangle = f.rect;
@@ -112,7 +114,7 @@ export class CoreVisionFaceDetector implements FaceDetector {
       const roll: number = f.pose ? f.pose.roll : 0;
       const landmarks: FaceLandmarks = CoreVisionFaceDetector.synthesizeLandmarks(box, roll);
       const id: string = `det_${Date.now().toString(36)}_${this.seq++}`;
-      result.push(new FaceDetection(id, box, landmarks, f.probability));
+      result.push(new FaceDetection(id, box, landmarks, prob));
     }
     Logger.info(CoreVisionFaceDetector.TAG, `detected ${result.length} face(s)`);
     return result;

@@ -3,7 +3,7 @@
  * 分层：domain / 用例
  *
  * 职责：对代理图执行人脸检测，返回 FaceDetection 列表。
- * 依赖：FaceDetector 抽象(默认 ONNX Runtime + YOLOv8-face 实现)。
+ * 依赖：FaceDetector 抽象(默认实现为系统 Core Vision Kit 的 CoreVisionFaceDetector)。
  */
 import { image } from '@kit.ImageKit';
 import { FaceDetector } from '../../capability/inference/FaceDetector';

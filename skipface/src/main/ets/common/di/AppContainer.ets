@@ -115,17 +115,14 @@ export class AppContainer {
     this._settingsRepo = settings;
     this._photoRepo = new PhotoRepository();
 
-    // 能力(推理引擎)：默认使用 ONNX Runtime 直接加载 rawfile 的 YOLOv8-face 权重
-    // (skipface_face.onnx)，端侧本地推理、开箱即用。若需改用系统视觉服务或 MindSpore Lite，
-    // 改为 new CoreVisionFaceDetector() / new MindSporeFaceDetector(context) 即可。
-    // 模型加载失败(如非 arm64 设备)时检测器内部优雅降级为空，应用仍可手动添加遮挡。
-    // 能力(推理引擎)：默认使用系统 Core Vision Kit 人脸检测(CoreVisionFaceDetector)。
-    // 系统服务为独立进程、随系统优化，不在应用进程内加载第三方原生模型，
-    // 从根本上规避了 @ohos/onnxruntime NAPI 在 session.Run 抛出 C++ 异常(std::length_error)
-    // 逸出 NAPI 边界导致整个进程 abort(SIGABRT) 的崩溃(多次进出编辑器后必现)。
-    // 如需改回 YOLOv8/ONNX 或 MindSpore Lite，替换为 new OnnxFaceDetector(context) /
-    // new MindSporeFaceDetector(context) 即可(三者共享同一 FaceDetector 抽象)。
+    // 能力(推理引擎)：使用系统 Core Vision Kit 人脸检测(CoreVisionFaceDetector)。
+    // 选型理由：
+    //   1) 完全本地、离线、免模型文件，契合"隐私优先、纯本地"定位；
+    //   2) 系统服务为独立进程、随系统优化，不在应用进程内加载第三方原生推理库，
+    //      从根本上规避了以往在应用进程内跑 ONNX Runtime(NAPI) 时 session.Run 抛出的
+    //      C++ 异常(std::length_error)逸出 NAPI 边界、导致整个进程 abort(SIGABRT) 的崩溃。
     // 设备不支持系统人脸能力时检测器内部优雅降级为空，应用仍可手动添加遮挡。
+    // 检测器抽象 FaceDetector 保留，未来可无侵入替换为其它系统/自研实现而不动上层。
     this._faceDetector = new CoreVisionFaceDetector();
     // 启动即异步预加载(初始化分析器)，使首张图片检测无需等待初始化耗时。
     this._faceDetector.load().catch((): void => {

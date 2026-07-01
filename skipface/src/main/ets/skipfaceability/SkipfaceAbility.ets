@@ -132,7 +132,10 @@ export default class SkipfaceAbility extends UIAbility {
   onWindowStageDestroy(): void {
     const container = AppContainer.instance();
     if (container.isInitialized()) {
-      container.faceDetector.release();
+      // release 为异步：以游离方式触发并吞掉拒绝，避免未处理拒绝在销毁阶段升级为崩溃。
+      container.faceDetector.release().catch((e: Error): void => {
+        Logger.warn(TAG, `face detector release failed: ${e.message}`);
+      });
     }
     this.mainWindow = null;
   }
