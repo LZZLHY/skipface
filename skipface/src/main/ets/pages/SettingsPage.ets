@@ -245,6 +245,24 @@ export struct SettingsPage {
       title: $r('app.string.privacy_offline_title'),
       subtitle: $r('app.string.privacy_offline_desc')
     })
+    SettingRow({
+      title: $r('app.string.privacy_policy_entry'),
+      showChevron: true,
+      showDivider: true,
+      onClickRow: (): void => { this.openPrivacy(); }
+    })
+  }
+
+  /** 在系统浏览器打开隐私政策页面。 */
+  private openPrivacy(): void {
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    ctx.openLink(AppConstants.PRIVACY_URL, { appLinkingOnly: false }).catch((): void => {
+      Logger.warn('SettingsPage', 'open privacy url failed');
+      this.getUIContext().getPromptAction().showToast({
+        message: this.getUIContext().getHostContext()!.resourceManager.getStringByNameSync('about_open_failed'),
+        duration: 2000
+      });
+    });
   }
 
   @Builder

@@ -34,6 +34,8 @@ export class AppConstants {
   /** ====== 关于 ====== */
   /** 开源仓库地址（设置页“关于”内点击跳转系统浏览器）。 */
   static readonly GITHUB_URL: string = 'https://github.com/LZZLHY/skipface';
+  /** 隐私政策页面地址（首次启动同意弹窗与设置页入口跳转）。 */
+  static readonly PRIVACY_URL: string = 'https://lzzlhy.github.io/skipface/privacy.html';
 
   private constructor() {}
 }
@@ -47,6 +49,8 @@ export class PrefKeys {
   static readonly DEFAULT_BLUR_EFFECT: string = 'default_blur_effect';
   static readonly DEFAULT_BLUR_TARGET: string = 'default_blur_target';
   static readonly THEME_MODE: string = 'theme_mode';
+  /** 是否已同意隐私政策（首次启动同意门控）。 */
+  static readonly PRIVACY_AGREED: string = 'privacy_agreed';
 
   private constructor() {}
 }

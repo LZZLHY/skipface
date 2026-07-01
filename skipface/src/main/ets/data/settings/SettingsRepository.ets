@@ -245,4 +245,23 @@ export class SettingsRepository {
   async setThemeMode(mode: ThemeMode): Promise<void> {
     await this.put(PrefKeys.THEME_MODE, mode as number);
   }
+
+  /** ====== 隐私政策同意（首次启动门控） ====== */
+
+  /** 是否已同意隐私政策（默认 false，未同意则首启弹窗）。 */
+  getPrivacyAgreed(): boolean {
+    if (!this.store) {
+      return false;
+    }
+    try {
+      return this.store.getSync(PrefKeys.PRIVACY_AGREED, false) as boolean;
+    } catch (e) {
+      Logger.warn(SettingsRepository.TAG, 'getPrivacyAgreed failed');
+      return false;
+    }
+  }
+
+  async setPrivacyAgreed(agreed: boolean): Promise<void> {
+    await this.put(PrefKeys.PRIVACY_AGREED, agreed);
+  }
 }
