@@ -45,6 +45,8 @@ export class EditorViewModel {
   // ====== 偏好(来自设置) ======
   @Trace emojiPalette: string[] = [];
   @Trace selectedFont: string = DEFAULT_FONT_MARKER;
+  /** 是否允许自动布置表情时重复使用同一表情(来自设置，可在编辑页快捷切换)。 */
+  @Trace allowEmojiRepeat: boolean = false;
   /** 已注册的自定义 emoji 字体族名(空串表示使用系统默认字体)。由页面注册字体后写入。 */
   @Trace emojiFontFamily: string = '';
 
@@ -80,6 +82,7 @@ export class EditorViewModel {
     const repo = this.container.settingsRepo;
     this.emojiPalette = repo.getEmojiPalette();
     this.selectedFont = repo.getSelectedFont();
+    this.allowEmojiRepeat = repo.getAllowEmojiRepeat();
     this.maskKind = repo.getDefaultMaskKind();
     this.blurEffect = repo.getDefaultBlurEffect();
     this.blurTarget = repo.getDefaultBlurTarget();
@@ -124,10 +127,26 @@ export class EditorViewModel {
   private rebuildMasksForCurrentMode(): void {
     if (this.maskKind === MaskKind.EMOJI) {
       this.blurMasks = [];
-      this.emojiMasks = this.container.placeEmoji.execute(this.detections, this.emojiPalette);
+      this.emojiMasks = this.container.placeEmoji.execute(this.detections, this.emojiPalette, this.allowEmojiRepeat);
     } else {
       this.emojiMasks = [];
       this.blurMasks = this.container.buildBlur.execute(this.detections, this.blurTarget);
+    }
+  }
+
+  /**
+   * 切换"允许表情重复"：持久化并即时重排(仅在表情模式且已加载图片时)。
+   * 重排会覆盖当前自动/手动的表情遮挡(符合"切换即重排"的约定)。
+   */
+  async setAllowEmojiRepeat(allow: boolean): Promise<void> {
+    if (this.allowEmojiRepeat === allow) {
+      return;
+    }
+    this.allowEmojiRepeat = allow;
+    await this.container.settingsRepo.setAllowEmojiRepeat(allow);
+    if (this.loaded && this.maskKind === MaskKind.EMOJI) {
+      this.cancelEditing();
+      this.emojiMasks = this.container.placeEmoji.execute(this.detections, this.emojiPalette, this.allowEmojiRepeat);
     }
   }
 

@@ -51,6 +51,8 @@ export class PrefKeys {
   static readonly THEME_MODE: string = 'theme_mode';
   /** 是否已同意隐私政策（首次启动同意门控）。 */
   static readonly PRIVACY_AGREED: string = 'privacy_agreed';
+  /** 是否允许自动布置表情时重复使用同一表情。 */
+  static readonly ALLOW_EMOJI_REPEAT: string = 'allow_emoji_repeat';
 
   private constructor() {}
 }

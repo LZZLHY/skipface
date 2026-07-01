@@ -25,6 +25,7 @@ export class SettingsViewModel {
   @Trace defaultMaskKind: MaskKind = MaskKind.EMOJI;
   @Trace defaultBlurEffect: BlurEffect = BlurEffect.GAUSSIAN;
   @Trace defaultBlurTarget: BlurTarget = BlurTarget.FACE;
+  @Trace allowEmojiRepeat: boolean = false;
   @Trace appVersion: string = '1.0.0';
 
   private context: common.UIAbilityContext | null = null;
@@ -43,6 +44,7 @@ export class SettingsViewModel {
     this.defaultMaskKind = this.repo.getDefaultMaskKind();
     this.defaultBlurEffect = this.repo.getDefaultBlurEffect();
     this.defaultBlurTarget = this.repo.getDefaultBlurTarget();
+    this.allowEmojiRepeat = this.repo.getAllowEmojiRepeat();
     await this.loadVersion();
   }
 
@@ -168,5 +170,10 @@ export class SettingsViewModel {
   async setDefaultBlurTarget(target: BlurTarget): Promise<void> {
     this.defaultBlurTarget = target;
     await this.repo.setDefaultBlurTarget(target);
+  }
+
+  async setAllowEmojiRepeat(allow: boolean): Promise<void> {
+    this.allowEmojiRepeat = allow;
+    await this.repo.setAllowEmojiRepeat(allow);
   }
 }

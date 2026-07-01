@@ -114,6 +114,13 @@ export struct SettingsPage {
   }
 
   @Builder
+  repeatTrailing() {
+    Toggle({ type: ToggleType.Switch, isOn: this.vm.allowEmojiRepeat })
+      .selectedColor($r('app.color.brand'))
+      .onChange((v: boolean): void => { this.vm.setAllowEmojiRepeat(v); })
+  }
+
+  @Builder
   fontTrailing() {
     Button({ type: ButtonType.Capsule, stateEffect: true }) {
       Text($r('app.string.action_add')).fontSize($r('app.float.font_caption')).fontColor($r('app.color.brand'))
@@ -133,6 +140,12 @@ export struct SettingsPage {
     SettingRow({ title: $r('app.string.pref_default_mode'), trailing: (): void => { this.modeTrailing() } })
     SettingRow({ title: $r('app.string.pref_default_effect'), showDivider: true, trailing: (): void => { this.effectTrailing() } })
     SettingRow({ title: $r('app.string.pref_default_target'), showDivider: true, trailing: (): void => { this.targetTrailing() } })
+    SettingRow({
+      title: $r('app.string.pref_allow_emoji_repeat'),
+      subtitle: $r('app.string.pref_allow_emoji_repeat_desc'),
+      showDivider: true,
+      trailing: (): void => { this.repeatTrailing() }
+    })
   }
 
   @Builder

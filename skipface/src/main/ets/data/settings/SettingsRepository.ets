@@ -236,6 +236,25 @@ export class SettingsRepository {
     await this.put(PrefKeys.DEFAULT_BLUR_TARGET, target as number);
   }
 
+  /** ====== 表情重复偏好 ====== */
+
+  /** 是否允许自动布置表情时重复使用同一表情（默认 false：够分不重复）。 */
+  getAllowEmojiRepeat(): boolean {
+    if (!this.store) {
+      return false;
+    }
+    try {
+      return this.store.getSync(PrefKeys.ALLOW_EMOJI_REPEAT, false) as boolean;
+    } catch (e) {
+      Logger.warn(SettingsRepository.TAG, 'getAllowEmojiRepeat failed');
+      return false;
+    }
+  }
+
+  async setAllowEmojiRepeat(allow: boolean): Promise<void> {
+    await this.put(PrefKeys.ALLOW_EMOJI_REPEAT, allow);
+  }
+
   /** ====== 主题模式 ====== */
 
   getThemeMode(): ThemeMode {

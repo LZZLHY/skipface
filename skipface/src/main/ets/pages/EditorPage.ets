@@ -416,41 +416,57 @@ export struct EditorPage {
     .backgroundColor($r('app.color.surface'))
   }
 
-  /** Emoji 工具：调色板横向滚动 + 添加。 */
+  /** Emoji 工具：允许重复开关 + 调色板横向滚动 + 添加。 */
   @Builder
   emojiTools() {
-    Row() {
-      List({ space: 10 }) {
-        ForEach(this.vm.emojiPalette, (e: string) => {
-          ListItem() {
-            Text(e)
-              .fontSize(28)
-              .width(52).height(52)
-              .textAlign(TextAlign.Center)
-              .borderRadius(16)
-              .backgroundColor($r('app.color.surface_2'))
-              .onClick(() => this.vm.addEmojiAtCenter(e))
-          }
-        }, (e: string, i: number) => `${i}_${e}`)
+    Column() {
+      // 快捷开关：允许表情重复（与设置项同一持久化状态，切换即重排）。
+      Row() {
+        Text($r('app.string.emoji_repeat_toggle'))
+          .fontSize($r('app.float.font_caption'))
+          .fontColor($r('app.color.text_secondary'))
+          .layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: this.vm.allowEmojiRepeat })
+          .width(46).height(28)
+          .selectedColor($r('app.color.brand'))
+          .onChange((v: boolean): void => { this.vm.setAllowEmojiRepeat(v); })
       }
-      .listDirection(Axis.Horizontal)
-      .layoutWeight(1)
-      .height(52)
+      .width('100%').alignItems(VerticalAlign.Center).margin({ bottom: 10 })
 
-      Button({ type: ButtonType.Normal, stateEffect: true }) {
-        SymbolGlyph($r('sys.symbol.plus')).fontSize(26).fontColor([$r('app.color.brand')])
+      Row() {
+        List({ space: 10 }) {
+          ForEach(this.vm.emojiPalette, (e: string) => {
+            ListItem() {
+              Text(e)
+                .fontSize(28)
+                .width(52).height(52)
+                .textAlign(TextAlign.Center)
+                .borderRadius(16)
+                .backgroundColor($r('app.color.surface_2'))
+                .onClick(() => this.vm.addEmojiAtCenter(e))
+            }
+          }, (e: string, i: number) => `${i}_${e}`)
+        }
+        .listDirection(Axis.Horizontal)
+        .layoutWeight(1)
+        .height(52)
+
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.plus')).fontSize(26).fontColor([$r('app.color.brand')])
+        }
+        .width(52).height(52).borderRadius(16)
+        .backgroundColor($r('app.color.brand_soft'))
+        .borderWidth(1.5).borderColor($r('app.color.brand'))
+        .margin({ left: 10 })
+        .onClick(() => {
+          // 临时：表情模式下点 + 调出键盘输入表情(而非进入点击画布添加模式)。
+          this.emojiInputDraft = '';
+          this.emojiInputShown = true;
+        })
       }
-      .width(52).height(52).borderRadius(16)
-      .backgroundColor($r('app.color.brand_soft'))
-      .borderWidth(1.5).borderColor($r('app.color.brand'))
-      .margin({ left: 10 })
-      .onClick(() => {
-        // 临时：表情模式下点 + 调出键盘输入表情(而非进入点击画布添加模式)。
-        this.emojiInputDraft = '';
-        this.emojiInputShown = true;
-      })
+      .width('100%').alignItems(VerticalAlign.Center)
     }
-    .width('100%').alignItems(VerticalAlign.Center)
+    .width('100%')
   }
 
   /** 模糊工具：效果芯片 + 目标 + 添加。 */
