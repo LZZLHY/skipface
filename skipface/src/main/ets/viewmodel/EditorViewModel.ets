@@ -223,6 +223,10 @@ export class EditorViewModel {
     for (const d of faces) {
       out.push(EditorViewModel.mapDetection(d, rx, ry, sx, sy));
     }
+    // 诊断：记录"零产出"块的解码尺寸，用于测定系统检测器的真实最小输入尺寸并据此调参。
+    if (faces.length === 0) {
+      Logger.info(EditorViewModel.TAG, `empty region ${dw}x${dh} (depth ${depth})`);
+    }
 
     // 达到上限且仍可细分 → 切四块(带重叠)递归。
     const canSplit: boolean =

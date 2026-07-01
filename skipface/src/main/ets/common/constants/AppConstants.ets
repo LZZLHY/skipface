@@ -22,7 +22,7 @@ export class AppConstants {
   /** 细分最大深度(整图=0；1→4 块；2→16 块；3→64 块，仅拥挤区域才会展开)。 */
   static readonly DETECT_MAX_DEPTH: number = 3;
   /** 允许继续细分的最小区域边长(原图像素)：低于此值不再切，避免切出系统拒绝的过小块。 */
-  static readonly DETECT_MIN_SPLIT: number = 400;
+  static readonly DETECT_MIN_SPLIT: number = 320;
   /**
    * 系统检测器可接受的最小输入边长(像素)。解码后短边小于此值的块直接跳过检测——
    * 这类过小块会触发 "parameter check failed" 报错、白白消耗调用预算，且几乎无有效人脸。
@@ -31,7 +31,7 @@ export class AppConstants {
   /** 细分时相邻子块的重叠比例，避免骑跨边界的人脸被切断漏检。 */
   static readonly DETECT_SPLIT_OVERLAP: number = 0.3;
   /** 检测调用总次数上限(安全阀，避免极端图片过度细分导致耗时过长)。 */
-  static readonly DETECT_MAX_CALLS: number = 80;
+  static readonly DETECT_MAX_CALLS: number = 96;
   /** 单块解码的最大边长(原图像素)：超过则降采样解码，限制内存/耗时。 */
   static readonly DETECT_REGION_MAX: number = 2200;
   /** 分块结果合并去重的 IoU 阈值：重叠超过该值视为同一张脸，保留分数更高者。 */
