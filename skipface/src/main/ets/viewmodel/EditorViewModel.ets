@@ -31,6 +31,15 @@ interface DetectBudget {
   anyOk: boolean;
 }
 
+/** 广度优先细分的待检测区域任务(原图像素坐标 + 细分深度)。 */
+interface RegionTask {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  depth: number;
+}
+
 /** 一次性 UI 提示事件(由 UI 消费后清空)。message 为字符串资源已解析或直接文案。 */
 @ObservedV2
 export class EditorViewModel {
@@ -156,7 +165,20 @@ export class EditorViewModel {
 
     const out: FaceDetection[] = [];
     const budget: DetectBudget = { calls: 0, anyOk: false };
-    await this.detectRegion(uri, 0, 0, ow, oh, ow, oh, 0, out, budget);
+    // 广度优先(逐层)遍历：先检测所有一级块，再二级……使调用预算在整幅图上公平分配，
+    // 即使用满预算也是均匀的粗覆盖，避免"深度优先把预算耗在左上角、右/下半边空白"的问题。
+    const queue: RegionTask[] = [{ x: 0, y: 0, w: ow, h: oh, depth: 0 }];
+    while (queue.length > 0 && budget.calls < AppConstants.DETECT_MAX_CALLS) {
+      const t: RegionTask = queue.shift() as RegionTask;
+      const count: number = await this.detectOneRegion(uri, t.x, t.y, t.w, t.h, t.depth, out, budget);
+      const canSplit: boolean =
+        t.depth < AppConstants.DETECT_MAX_DEPTH && Math.min(t.w, t.h) > AppConstants.DETECT_MIN_SPLIT;
+      if (count >= AppConstants.DETECT_SUBDIVIDE_THRESHOLD && canSplit) {
+        for (const q of EditorViewModel.computeQuads(t, ow, oh)) {
+          queue.push(q);
+        }
+      }
+    }
 
     // 无任何成功调用且无结果：视为检测异常(与"检测到 0 张"区分)。
     if (out.length === 0 && !budget.anyOk) {
@@ -173,23 +195,18 @@ export class EditorViewModel {
   }
 
   /**
-   * 递归检测一个原图矩形区域，把结果(映射回原图坐标)累加到 out。
-   * 若该区域返回数达到阈值(疑似被截断)且可继续细分，则切四块(带重叠)递归。
-   * @param rx/ry/rw/rh 区域(原图坐标)。 @param ow/oh 原图尺寸(用于裁剪子块)。
+   * 检测单个原图矩形区域，把结果(映射回原图坐标)累加到 out，返回该块检出的人脸数。
+   * 大区域按 REGION_MAX 降采样，小区域升采样到 UPSCALE_TO(放大小脸、越过系统最小尺寸限制)。
+   * @param rx/ry/rw/rh 区域(原图坐标)。
    */
-  private async detectRegion(
+  private async detectOneRegion(
     uri: string, rx: number, ry: number, rw: number, rh: number,
-    ow: number, oh: number, depth: number, out: FaceDetection[], budget: DetectBudget
-  ): Promise<void> {
-    if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
-      return;
-    }
+    depth: number, out: FaceDetection[], budget: DetectBudget
+  ): Promise<number> {
     // 退化区域(原生短边过小)：升采样也无意义，跳过。
     if (depth > 0 && Math.min(rw, rh) < AppConstants.DETECT_MIN_NATIVE) {
-      return;
+      return 0;
     }
-    // 决定解码尺寸：大区域按 REGION_MAX 降采样限制内存；小区域升采样到 UPSCALE_TO，
-    // 使其中小脸放大、越过系统检测器的最小人脸/输入尺寸限制。记录缩放以便坐标还原。
     const nativeLong: number = Math.max(rw, rh);
     let scale: number = 1;
     if (nativeLong > AppConstants.DETECT_REGION_MAX) {
@@ -218,48 +235,45 @@ export class EditorViewModel {
       }
     }
 
-    // 解码区域坐标 → 原图坐标：加区域原点 + 乘回降采样系数。
+    // 解码区域坐标 → 原图坐标：加区域原点 + 乘回缩放系数。
     const sx: number = dw > 0 ? rw / dw : 1;
     const sy: number = dh > 0 ? rh / dh : 1;
     for (const d of faces) {
       out.push(EditorViewModel.mapDetection(d, rx, ry, sx, sy));
     }
-    // 诊断：记录"零产出"块的解码尺寸，用于测定系统检测器的真实最小输入尺寸并据此调参。
-    if (faces.length === 0) {
-      Logger.info(EditorViewModel.TAG, `empty region ${dw}x${dh} (depth ${depth})`);
-    }
+    return faces.length;
+  }
 
-    // 达到上限且仍可细分 → 切四块(带重叠)递归。
-    const canSplit: boolean =
-      depth < AppConstants.DETECT_MAX_DEPTH && Math.min(rw, rh) > AppConstants.DETECT_MIN_SPLIT;
-    if (faces.length >= AppConstants.DETECT_SUBDIVIDE_THRESHOLD && canSplit) {
-      const ov: number = AppConstants.DETECT_SPLIT_OVERLAP;
-      const hw: number = rw / 2;
-      const hh: number = rh / 2;
-      const ex: number = hw * ov;
-      const ey: number = hh * ov;
-      const quads: number[][] = [
-        [rx, ry, hw + ex, hh + ey],
-        [rx + hw - ex, ry, hw + ex, hh + ey],
-        [rx, ry + hh - ey, hw + ex, hh + ey],
-        [rx + hw - ex, ry + hh - ey, hw + ex, hh + ey]
-      ];
-      for (const q of quads) {
-        const qx: number = Math.max(0, Math.round(q[0]));
-        const qy: number = Math.max(0, Math.round(q[1]));
-        let qw: number = Math.round(q[2]);
-        let qh: number = Math.round(q[3]);
-        if (qx + qw > ow) {
-          qw = ow - qx;
-        }
-        if (qy + qh > oh) {
-          qh = oh - qy;
-        }
-        if (qw >= 1 && qh >= 1) {
-          await this.detectRegion(uri, qx, qy, qw, qh, ow, oh, depth + 1, out, budget);
-        }
+  /** 把一个区域切成四个带重叠、并裁剪到图内的子块任务(深度+1)。 */
+  private static computeQuads(t: RegionTask, ow: number, oh: number): RegionTask[] {
+    const ov: number = AppConstants.DETECT_SPLIT_OVERLAP;
+    const hw: number = t.w / 2;
+    const hh: number = t.h / 2;
+    const ex: number = hw * ov;
+    const ey: number = hh * ov;
+    const raw: number[][] = [
+      [t.x, t.y, hw + ex, hh + ey],
+      [t.x + hw - ex, t.y, hw + ex, hh + ey],
+      [t.x, t.y + hh - ey, hw + ex, hh + ey],
+      [t.x + hw - ex, t.y + hh - ey, hw + ex, hh + ey]
+    ];
+    const quads: RegionTask[] = [];
+    for (const q of raw) {
+      const qx: number = Math.max(0, Math.round(q[0]));
+      const qy: number = Math.max(0, Math.round(q[1]));
+      let qw: number = Math.round(q[2]);
+      let qh: number = Math.round(q[3]);
+      if (qx + qw > ow) {
+        qw = ow - qx;
+      }
+      if (qy + qh > oh) {
+        qh = oh - qy;
+      }
+      if (qw >= 1 && qh >= 1) {
+        quads.push({ x: qx, y: qy, w: qw, h: qh, depth: t.depth + 1 });
       }
     }
+    return quads;
   }
 
   /** NMS 去重：按分数降序，IoU 超阈值视为同一张脸，保留分数更高者。 */
