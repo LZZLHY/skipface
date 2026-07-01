@@ -15,7 +15,6 @@ import { LoadedImage } from '../domain/model/LoadedImage';
 import { FaceDetection, FaceLandmarks } from '../domain/model/FaceDetection';
 import { EmojiMask, BlurMask } from '../domain/model/Mask';
 import { RectF, PointF } from '../domain/model/Geometry';
-import { ProxyDecodeResult } from '../data/photo/PhotoRepository';
 import { MaskKind, BlurEffect, BlurTarget } from '../domain/model/MaskEnums';
 import { ExportRequest } from '../capability/imaging/ImageExporter';
 import { Result } from '../common/base/Result';
@@ -23,6 +22,14 @@ import { AppConstants } from '../common/constants/AppConstants';
 import { Logger } from '../common/utils/Logger';
 import { EmojiUtil } from '../common/utils/EmojiUtil';
 import { DEFAULT_FONT_MARKER } from '../data/settings/SettingsRepository';
+
+/** 分块检测用的矩形(原图像素坐标)。 */
+interface TileRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 /** 一次性 UI 提示事件(由 UI 消费后清空)。message 为字符串资源已解析或直接文案。 */
 @ObservedV2
@@ -108,8 +115,8 @@ export class EditorViewModel {
     this.loaded = loadRes.value;
     this.aspectRatio = loadRes.value.aspectRatio;
 
-    // 在高分辨率检测图上检测(人群/毕业照小脸召回)，坐标已映射回代理图空间。
-    const detected: FaceDetection[] | null = await this.detectOnHiRes(uri, loadRes.value);
+    // 分块检测：按原生分辨率切块逐块检测再合并，突破系统检测器的整图下采样/数量限制。
+    const detected: FaceDetection[] | null = await this.detectAllFaces(uri, loadRes.value);
     if (detected === null) {
       this.isProcessing = false;
       // 检测器内部已对"模型不可用"优雅降级为返回空；走到这里说明发生了意外错误。
@@ -125,50 +132,157 @@ export class EditorViewModel {
   }
 
   /**
-   * 在高分辨率检测图上执行人脸检测，并把结果坐标映射回代理图空间。
-   * 目的：人群/毕业照中人脸在 1024 代理图上过小会被系统检测器漏检。
-   * @returns 代理图坐标系下的检测结果；发生意外错误返回 null(与"降级空列表"区分)。
+   * 分块人脸检测：把原图按原生分辨率切成带重叠的方块，逐块调用系统检测器，
+   * 把各块结果平移回原图坐标合并、NMS 去重，最后按比例映射到代理图坐标。
+   * 这样每块内的人脸相对更大、数量更少，规避系统检测器"整图下采样丢小脸/单次数量上限"。
+   * @returns 代理图坐标系下的检测结果；发生意外错误(全部块失败)返回 null。
    */
-  private async detectOnHiRes(uri: string, loaded: LoadedImage): Promise<FaceDetection[] | null> {
-    // 代理图已足够大(原图较小)：直接用代理图检测，避免重复解码。
-    const proxyLong: number = Math.max(loaded.proxyWidth, loaded.proxyHeight);
-    if (proxyLong >= AppConstants.DETECT_MAX_SIDE) {
+  private async detectAllFaces(uri: string, loaded: LoadedImage): Promise<FaceDetection[] | null> {
+    let ow: number = 0;
+    let oh: number = 0;
+    try {
+      const size: image.Size = await this.container.photoRepo.getImageSize(uri);
+      ow = size.width;
+      oh = size.height;
+    } catch (e) {
+      // 取尺寸失败：退回代理图整图检测。
+      Logger.warn(EditorViewModel.TAG, 'get image size failed, fallback to proxy detect');
       const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(loaded.proxy);
-      if (!r.ok || !r.value) {
-        Logger.error(EditorViewModel.TAG, 'detect failed', r.error);
-        return null;
-      }
-      return r.value;
+      return r.ok && r.value ? r.value : null;
+    }
+    if (ow <= 0 || oh <= 0) {
+      const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(loaded.proxy);
+      return r.ok && r.value ? r.value : null;
     }
 
-    let detImg: image.PixelMap | null = null;
-    try {
-      const dec: ProxyDecodeResult =
-        await this.container.photoRepo.decodeProxy(uri, AppConstants.DETECT_MAX_SIDE);
-      detImg = dec.proxy;
-      const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(detImg);
-      if (!r.ok || !r.value) {
-        Logger.error(EditorViewModel.TAG, 'detect failed', r.error);
-        return null;
+    const tiles: TileRect[] = EditorViewModel.computeTiles(ow, oh);
+    const collected: FaceDetection[] = [];
+    let tilesFailed: number = 0;
+    for (const t of tiles) {
+      let pm: image.PixelMap | null = null;
+      try {
+        pm = await this.container.photoRepo.decodeRegion(uri, t.x, t.y, t.w, t.h);
+        const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(pm);
+        if (r.ok && r.value) {
+          for (const d of r.value) {
+            collected.push(EditorViewModel.translateDetection(d, t.x, t.y));
+          }
+        } else {
+          tilesFailed++;
+        }
+      } catch (e) {
+        tilesFailed++;
+        Logger.warn(EditorViewModel.TAG, 'tile detect failed');
+      } finally {
+        if (pm) {
+          EditorViewModel.safeRelease(pm);
+        }
       }
-      // 检测图 → 代理图 的等比缩放系数(两者同源、保比)。
-      const k: number = dec.proxyWidth > 0 ? loaded.proxyWidth / dec.proxyWidth : 1;
-      if (Math.abs(k - 1) < 1e-3) {
-        return r.value;
-      }
-      return r.value.map((d: FaceDetection): FaceDetection => EditorViewModel.scaleDetection(d, k));
-    } catch (e) {
-      Logger.error(EditorViewModel.TAG, 'hi-res detect failed', e as Error);
+    }
+    // 全部块都失败且无任何结果：视为检测异常。
+    if (collected.length === 0 && tilesFailed === tiles.length) {
       return null;
-    } finally {
-      // 检测图仅用于检测，用后立即释放，避免大图原生内存停留。
-      if (detImg) {
-        EditorViewModel.safeRelease(detImg);
+    }
+    // 原图坐标去重 → 映射回代理图坐标。
+    const merged: FaceDetection[] = EditorViewModel.nms(collected, AppConstants.DETECT_DEDUP_IOU);
+    const k: number = ow > 0 ? loaded.proxyWidth / ow : 1;
+    Logger.info(EditorViewModel.TAG, `tiled detect: ${tiles.length} tile(s), ${merged.length} face(s)`);
+    if (Math.abs(k - 1) < 1e-3) {
+      return merged;
+    }
+    return merged.map((d: FaceDetection): FaceDetection => EditorViewModel.scaleDetection(d, k));
+  }
+
+  /** 计算覆盖 (ow×oh) 的带重叠分块；块数超上限时自动增大块尺寸。 */
+  private static computeTiles(ow: number, oh: number): TileRect[] {
+    const overlap: number = AppConstants.DETECT_TILE_OVERLAP;
+    let tile: number = AppConstants.DETECT_TILE_SIZE;
+    while (true) {
+      const step: number = Math.max(1, Math.floor(tile * (1 - overlap)));
+      const tileW: number = ow <= tile ? ow : tile;
+      const tileH: number = oh <= tile ? oh : tile;
+      const xs: number[] = EditorViewModel.axisStarts(ow, tileW, step);
+      const ys: number[] = EditorViewModel.axisStarts(oh, tileH, step);
+      if (xs.length * ys.length <= AppConstants.DETECT_MAX_TILES || tile >= Math.max(ow, oh)) {
+        const tiles: TileRect[] = [];
+        for (const y of ys) {
+          for (const x of xs) {
+            tiles.push({ x, y, w: tileW, h: tileH });
+          }
+        }
+        return tiles;
       }
+      tile = Math.round(tile * 1.3);
     }
   }
 
-  /** 按比例缩放一次检测结果的框与关键点(检测图坐标 → 代理图坐标)。 */
+  /** 某一轴的分块起点列表：等距铺开，最后一块对齐到边缘，去重。 */
+  private static axisStarts(total: number, dim: number, step: number): number[] {
+    if (total <= dim) {
+      return [0];
+    }
+    const starts: number[] = [];
+    let s: number = 0;
+    while (s + dim < total) {
+      starts.push(s);
+      s += step;
+    }
+    const last: number = total - dim;
+    if (starts.length === 0 || starts[starts.length - 1] !== last) {
+      starts.push(last);
+    }
+    return starts;
+  }
+
+  /** NMS 去重：按分数降序，IoU 超阈值视为同一张脸，保留分数更高者。 */
+  private static nms(list: FaceDetection[], iouThreshold: number): FaceDetection[] {
+    const sorted: FaceDetection[] = list.slice().sort(
+      (a: FaceDetection, b: FaceDetection): number => b.score - a.score
+    );
+    const keep: FaceDetection[] = [];
+    for (const d of sorted) {
+      let duplicate: boolean = false;
+      for (const k of keep) {
+        if (EditorViewModel.iou(d.box, k.box) > iouThreshold) {
+          duplicate = true;
+          break;
+        }
+      }
+      if (!duplicate) {
+        keep.push(d);
+      }
+    }
+    return keep;
+  }
+
+  /** 两个矩形的 IoU。 */
+  private static iou(a: RectF, b: RectF): number {
+    const x1: number = Math.max(a.left, b.left);
+    const y1: number = Math.max(a.top, b.top);
+    const x2: number = Math.min(a.right, b.right);
+    const y2: number = Math.min(a.bottom, b.bottom);
+    const inter: number = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+    const areaA: number = Math.max(0, a.width) * Math.max(0, a.height);
+    const areaB: number = Math.max(0, b.width) * Math.max(0, b.height);
+    const union: number = areaA + areaB - inter;
+    return union <= 0 ? 0 : inter / union;
+  }
+
+  /** 平移一次检测结果的框与关键点(分块局部坐标 → 原图坐标)。 */
+  private static translateDetection(d: FaceDetection, dx: number, dy: number): FaceDetection {
+    const box: RectF = d.box.translated(dx, dy);
+    const l: FaceLandmarks = d.landmarks;
+    const lm: FaceLandmarks = new FaceLandmarks(
+      new PointF(l.leftEye.x + dx, l.leftEye.y + dy),
+      new PointF(l.rightEye.x + dx, l.rightEye.y + dy),
+      new PointF(l.nose.x + dx, l.nose.y + dy),
+      new PointF(l.mouthLeft.x + dx, l.mouthLeft.y + dy),
+      new PointF(l.mouthRight.x + dx, l.mouthRight.y + dy)
+    );
+    return new FaceDetection(d.id, box, lm, d.score);
+  }
+
+  /** 按比例缩放一次检测结果的框与关键点(原图坐标 → 代理图坐标)。 */
   private static scaleDetection(d: FaceDetection, f: number): FaceDetection {
     const box: RectF = d.box.scaled(f);
     const l: FaceLandmarks = d.landmarks;

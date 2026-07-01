@@ -14,11 +14,17 @@ export class AppConstants {
   /** 检测/编辑使用的代理图最大边长（性能与精度平衡）。 */
   static readonly DISPLAY_MAX_SIDE: number = 1024;
   /**
-   * 人脸检测专用图的最大边长。人群/毕业照中人脸在 1024 代理图上过小(20~30px)会被系统
-   * 检测器漏检；单独解码一张更大的图做检测(用后即释放)，再把坐标按比例映射回代理图空间，
-   * 显著提升多人小脸的召回。编辑仍用小代理图，内存不受影响。
+   * 人脸检测分块(tiling)边长(原图像素)。系统检测器会把输入整体下采样，人群/毕业照中
+   * 小脸会因此消失；改为把原图按原生分辨率切成带重叠的方块逐块检测，每块内人脸相对更大、
+   * 数量更少，再把坐标映射回原图并 NMS 去重，显著提升小脸召回。原图小于该尺寸时单块检测。
    */
-  static readonly DETECT_MAX_SIDE: number = 2560;
+  static readonly DETECT_TILE_SIZE: number = 1600;
+  /** 相邻分块的重叠比例(0~1)，避免骑跨块边界的人脸被两块各截一半而漏检。 */
+  static readonly DETECT_TILE_OVERLAP: number = 0.2;
+  /** 分块结果合并去重的 IoU 阈值：重叠超过该值视为同一张脸，保留分数更高者。 */
+  static readonly DETECT_DEDUP_IOU: number = 0.45;
+  /** 分块数量上限(过大图片时自动增大分块尺寸以不超过此数，兼顾耗时)。 */
+  static readonly DETECT_MAX_TILES: number = 25;
   /** 新增 Emoji 的默认直径（代理图坐标系，像素）。 */
   static readonly DEFAULT_EMOJI_DIAMETER: number = 100;
   /** 新增模糊区域的默认边长（代理图坐标系，像素）。 */

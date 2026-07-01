@@ -153,6 +153,55 @@ export class PhotoRepository {
     }
   }
 
+  /**
+   * 轻量读取原图像素尺寸(不做全分辨率解码)。
+   * @returns 原图宽高(像素)。
+   */
+  async getImageSize(uri: string): Promise<image.Size> {
+    const file: fs.File = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+    let source: image.ImageSource | undefined;
+    try {
+      source = image.createImageSource(file.fd);
+      if (!source) {
+        throw new Error('createImageSource 返回空(无法读取该图片)');
+      }
+      const info: image.ImageInfo = await source.getImageInfo();
+      return info.size;
+    } finally {
+      if (source) {
+        source.release();
+      }
+      fs.closeSync(file.fd);
+    }
+  }
+
+  /**
+   * 按原生分辨率解码原图的一个矩形区域(用于分块人脸检测，避免整图下采样丢失小脸)。
+   * @param x/y/w/h 区域(原图像素坐标)。
+   * @returns 该区域的 RGBA_8888 PixelMap。
+   */
+  async decodeRegion(uri: string, x: number, y: number, w: number, h: number): Promise<image.PixelMap> {
+    const file: fs.File = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+    let source: image.ImageSource | undefined;
+    try {
+      source = image.createImageSource(file.fd);
+      if (!source) {
+        throw new Error('createImageSource 返回空(无法读取该图片)');
+      }
+      const options: image.DecodingOptions = {
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888,
+        editable: true,
+        desiredRegion: { x, y, size: { width: w, height: h } }
+      };
+      return await source.createPixelMap(options);
+    } finally {
+      if (source) {
+        source.release();
+      }
+      fs.closeSync(file.fd);
+    }
+  }
+
   /** 将 PixelMap 编码为 PNG 字节。 */
   private async encodePng(pixelMap: image.PixelMap): Promise<ArrayBuffer> {
     const packer: image.ImagePacker = image.createImagePacker();
