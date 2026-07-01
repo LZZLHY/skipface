@@ -14,17 +14,23 @@ export class AppConstants {
   /** 检测/编辑使用的代理图最大边长（性能与精度平衡）。 */
   static readonly DISPLAY_MAX_SIDE: number = 1024;
   /**
-   * 人脸检测分块(tiling)边长(原图像素)。系统检测器会把输入整体下采样，人群/毕业照中
-   * 小脸会因此消失；改为把原图按原生分辨率切成带重叠的方块逐块检测，每块内人脸相对更大、
-   * 数量更少，再把坐标映射回原图并 NMS 去重，显著提升小脸召回。原图小于该尺寸时单块检测。
+   * 人脸检测自适应细分参数。系统检测器每次调用最多返回约 10 张脸；对多人合影，
+   * 若一次调用返回数达到该阈值，说明结果被截断，则把该区域切成带重叠的四块分别再检测，
+   * 反复细分直到某块不足阈值，最后合并 + NMS 去重，用"多次调用"突破"单次数量上限"。
    */
-  static readonly DETECT_TILE_SIZE: number = 1600;
-  /** 相邻分块的重叠比例(0~1)，避免骑跨块边界的人脸被两块各截一半而漏检。 */
-  static readonly DETECT_TILE_OVERLAP: number = 0.2;
+  static readonly DETECT_SUBDIVIDE_THRESHOLD: number = 10;
+  /** 细分最大深度(整图=0；1→4 块；2→16 块；3→64 块，仅拥挤区域才会展开)。 */
+  static readonly DETECT_MAX_DEPTH: number = 3;
+  /** 允许继续细分的最小区域边长(原图像素)，防止把过小区域切碎。 */
+  static readonly DETECT_MIN_SPLIT: number = 320;
+  /** 细分时相邻子块的重叠比例，避免骑跨边界的人脸被切断漏检。 */
+  static readonly DETECT_SPLIT_OVERLAP: number = 0.15;
+  /** 检测调用总次数上限(安全阀，避免极端图片过度细分导致耗时过长)。 */
+  static readonly DETECT_MAX_CALLS: number = 48;
+  /** 单块解码的最大边长(原图像素)：超过则降采样解码，限制内存/耗时。 */
+  static readonly DETECT_REGION_MAX: number = 2200;
   /** 分块结果合并去重的 IoU 阈值：重叠超过该值视为同一张脸，保留分数更高者。 */
   static readonly DETECT_DEDUP_IOU: number = 0.45;
-  /** 分块数量上限(过大图片时自动增大分块尺寸以不超过此数，兼顾耗时)。 */
-  static readonly DETECT_MAX_TILES: number = 25;
   /** 新增 Emoji 的默认直径（代理图坐标系，像素）。 */
   static readonly DEFAULT_EMOJI_DIAMETER: number = 100;
   /** 新增模糊区域的默认边长（代理图坐标系，像素）。 */

@@ -176,11 +176,15 @@ export class PhotoRepository {
   }
 
   /**
-   * 按原生分辨率解码原图的一个矩形区域(用于分块人脸检测，避免整图下采样丢失小脸)。
+   * 按区域解码原图的一个矩形(用于分块人脸检测)。可选把该区域降采样到 outW×outH，
+   * 以在超大图上限制单块内存/耗时；不传 out 尺寸时按原生分辨率解码。
    * @param x/y/w/h 区域(原图像素坐标)。
+   * @param outW/outH 目标解码尺寸(可选)。
    * @returns 该区域的 RGBA_8888 PixelMap。
    */
-  async decodeRegion(uri: string, x: number, y: number, w: number, h: number): Promise<image.PixelMap> {
+  async decodeRegion(
+    uri: string, x: number, y: number, w: number, h: number, outW?: number, outH?: number
+  ): Promise<image.PixelMap> {
     const file: fs.File = fs.openSync(uri, fs.OpenMode.READ_ONLY);
     let source: image.ImageSource | undefined;
     try {
@@ -193,6 +197,9 @@ export class PhotoRepository {
         editable: true,
         desiredRegion: { x, y, size: { width: w, height: h } }
       };
+      if (outW && outH && outW > 0 && outH > 0) {
+        options.desiredSize = { width: outW, height: outH };
+      }
       return await source.createPixelMap(options);
     } finally {
       if (source) {
