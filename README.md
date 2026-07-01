@@ -10,20 +10,9 @@
 
 <p>
 <img alt="HarmonyOS" src="https://img.shields.io/badge/HarmonyOS-6.1.0%20(API%2023)-0A59F7" />
-<img alt="Target" src="https://img.shields.io/badge/Target-26.0.0-0A59F7" />
 <img alt="Language" src="https://img.shields.io/badge/Language-ArkTS-3AC569" />
-<img alt="UI" src="https://img.shields.io/badge/UI-ArkUI-3AC569" />
-</p>
-<p>
 <img alt="License" src="https://img.shields.io/badge/License-MIT-blue" />
-<img alt="version" src="https://img.shields.io/badge/version-1.0.0-orange" />
-<img alt="privacy" src="https://img.shields.io/badge/%E9%9A%90%E7%A7%81-%E7%BA%AF%E6%9C%AC%E5%9C%B0%E7%A6%BB%E7%BA%BF-19B36B" />
-<img alt="devices" src="https://img.shields.io/badge/%E8%AE%BE%E5%A4%87-phone%20%C2%B7%20tablet%20%C2%B7%202in1-6A7078" />
-</p>
-<p>
-<a href="https://github.com/LZZLHY/skipface"><img alt="repo" src="https://img.shields.io/badge/GitHub-LZZLHY%2Fskipface-181717?logo=github" /></a>
 <img alt="stars" src="https://img.shields.io/github/stars/LZZLHY/skipface?style=flat" />
-<img alt="last commit" src="https://img.shields.io/github/last-commit/LZZLHY/skipface" />
 </p>
 
 **简体中文** · [English](#english)
