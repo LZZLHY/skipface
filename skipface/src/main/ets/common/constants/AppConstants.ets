@@ -19,19 +19,22 @@ export class AppConstants {
    * 反复细分直到某块不足阈值，最后合并 + NMS 去重，用"多次调用"突破"单次数量上限"。
    */
   static readonly DETECT_SUBDIVIDE_THRESHOLD: number = 8;
-  /** 细分最大深度(整图=0；1→4 块；2→16 块；3→64 块，仅拥挤区域才会展开)。 */
-  static readonly DETECT_MAX_DEPTH: number = 3;
-  /** 允许继续细分的最小区域边长(原图像素)：低于此值不再切，避免切出系统拒绝的过小块。 */
-  static readonly DETECT_MIN_SPLIT: number = 320;
+  /** 细分最大深度(仅密集块才会逐层展开；配合升采样可切到很细的区域)。 */
+  static readonly DETECT_MAX_DEPTH: number = 5;
+  /** 允许继续细分的最小区域边长(原图像素)：低于此值不再切。 */
+  static readonly DETECT_MIN_SPLIT: number = 120;
   /**
-   * 系统检测器可接受的最小输入边长(像素)。解码后短边小于此值的块直接跳过检测——
-   * 这类过小块会触发 "parameter check failed" 报错、白白消耗调用预算，且几乎无有效人脸。
+   * 检测输入的目标边长(像素)。关键优化：把小区域用 desiredSize **升采样**到该尺寸再检测，
+   * 使其中的小脸放大、越过系统检测器的最小人脸/输入尺寸限制；同时也让细分能切到很小的
+   * 原图区域(不再受"过小块被系统拒绝"的限制)。区域大于该尺寸则保持原生或按 REGION_MAX 降采样。
    */
-  static readonly DETECT_MIN_INPUT: number = 256;
+  static readonly DETECT_UPSCALE_TO: number = 720;
+  /** 参与检测的原图区域最小原生短边(像素)：低于此为退化区域，跳过(升采样也无意义)。 */
+  static readonly DETECT_MIN_NATIVE: number = 24;
   /** 细分时相邻子块的重叠比例，避免骑跨边界的人脸被切断漏检。 */
   static readonly DETECT_SPLIT_OVERLAP: number = 0.3;
   /** 检测调用总次数上限(安全阀，避免极端图片过度细分导致耗时过长)。 */
-  static readonly DETECT_MAX_CALLS: number = 96;
+  static readonly DETECT_MAX_CALLS: number = 120;
   /** 单块解码的最大边长(原图像素)：超过则降采样解码，限制内存/耗时。 */
   static readonly DETECT_REGION_MAX: number = 2200;
   /** 分块结果合并去重的 IoU 阈值：重叠超过该值视为同一张脸，保留分数更高者。 */

@@ -184,20 +184,21 @@ export class EditorViewModel {
     if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
       return;
     }
-    // 单块过大则降采样解码，限制内存/耗时；记录解码缩放以便坐标还原。
-    const longSide: number = Math.max(rw, rh);
-    let dw: number = rw;
-    let dh: number = rh;
-    if (longSide > AppConstants.DETECT_REGION_MAX) {
-      const f: number = AppConstants.DETECT_REGION_MAX / longSide;
-      dw = Math.max(1, Math.round(rw * f));
-      dh = Math.max(1, Math.round(rh * f));
-    }
-    // 子块过小(短边低于系统最小输入)则跳过：避免 "parameter check failed" 空耗预算。
-    // 顶层整图(depth=0)不跳过，保证极小图片也至少检测一次。
-    if (depth > 0 && Math.min(dw, dh) < AppConstants.DETECT_MIN_INPUT) {
+    // 退化区域(原生短边过小)：升采样也无意义，跳过。
+    if (depth > 0 && Math.min(rw, rh) < AppConstants.DETECT_MIN_NATIVE) {
       return;
     }
+    // 决定解码尺寸：大区域按 REGION_MAX 降采样限制内存；小区域升采样到 UPSCALE_TO，
+    // 使其中小脸放大、越过系统检测器的最小人脸/输入尺寸限制。记录缩放以便坐标还原。
+    const nativeLong: number = Math.max(rw, rh);
+    let scale: number = 1;
+    if (nativeLong > AppConstants.DETECT_REGION_MAX) {
+      scale = AppConstants.DETECT_REGION_MAX / nativeLong;
+    } else if (nativeLong < AppConstants.DETECT_UPSCALE_TO) {
+      scale = AppConstants.DETECT_UPSCALE_TO / nativeLong;
+    }
+    const dw: number = Math.max(1, Math.round(rw * scale));
+    const dh: number = Math.max(1, Math.round(rh * scale));
 
     budget.calls++;
     let faces: FaceDetection[] = [];
