@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SkipFace Privacy Policy</title>
+<style>
+  :root{
+    --brand:#5B6CFF; --brand-soft:#ECEEFF; --brand-deep:#3D4ED6;
+    --bg:#F5F6F8; --surface:#FFFFFF; --text:#1A1C1E; --text-2:#6A7078;
+    --divider:#E8EAED; --accent:#19B36B; --radius:16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#7C8AFF; --brand-soft:#23264D; --brand-deep:#AAB4FF;
+      --bg:#121316; --surface:#1E2024; --text:#ECECEC; --text-2:#9AA0A8; --divider:#2A2D32; }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"HarmonyOS Sans","Segoe UI",Roboto,sans-serif;
+    line-height:1.75; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:820px; margin:0 auto; padding:32px 20px 72px; }
+  header{ text-align:center; padding:28px 0 8px; }
+  .logo{ width:76px; height:76px; border-radius:20px; box-shadow:0 8px 24px rgba(91,108,255,.28); }
+  h1{ font-size:26px; margin:16px 0 4px; }
+  .sub{ color:var(--text-2); font-size:14px; }
+  .lang{ margin-top:14px; font-size:14px; }
+  .lang a{ color:var(--brand); text-decoration:none; }
+  .badge{ display:inline-block; background:var(--brand-soft); color:var(--brand-deep);
+    border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; margin-top:14px; }
+  .card{ background:var(--surface); border:1px solid var(--divider); border-radius:var(--radius);
+    padding:20px 22px; margin:18px 0; }
+  .card h2{ font-size:18px; margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+  .card h2 .n{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
+    background:var(--brand); color:#fff; border-radius:8px; font-size:14px; }
+  .lead{ background:linear-gradient(135deg,var(--brand),var(--brand-deep)); color:#fff; border:none; }
+  .lead strong{ font-weight:700; }
+  p{ margin:8px 0; }
+  ul{ margin:8px 0; padding-left:20px; }
+  li{ margin:4px 0; }
+  table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:14px; }
+  th,td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--divider); vertical-align:top; }
+  th{ color:var(--text-2); font-weight:600; }
+  .ok{ color:var(--accent); font-weight:700; }
+  a{ color:var(--brand); }
+  .note{ font-size:13px; color:var(--text-2); }
+  footer{ text-align:center; color:var(--text-2); font-size:13px; margin-top:28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="logo" src="assets/logo-rounded.png" alt="SkipFace" />
+    <h1>SkipFace — Privacy Policy</h1>
+    <div class="sub">Effective date: 2026-07-01 · Version v1.0</div>
+    <div class="lang"><a href="privacy.html">简体中文</a> · English</div>
+    <div class="badge">🔒 Zero collection · Fully on-device</div>
+  </header>
+
+  <div class="card lead">
+    <p><strong>In one sentence:</strong> the App does not collect, store, or upload any of your personal information; all processing happens locally on your device, and it declares no static sensitive permissions.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">·</span> Introduction</h2>
+    <p>SkipFace ("the App") is a privacy-first, fully on-device photo face-hiding tool. The developer 【Developer/Company name】 takes your personal information and privacy seriously. This policy explains how the App handles and protects your information. Please read it carefully before use.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">1</span> Personal Information We Collect</h2>
+    <p><span class="ok">The App collects no personal information</span>, and never uploads your photos, face data, or usage records to any server or third party.</p>
+    <ul>
+      <li><b>Photo content:</b> used only in local memory/cache for masking; never uploaded or shared.</li>
+      <li><b>Face detection data:</b> performed on-device by the system Core Vision Kit; used only to position masks in the current session; not persisted or transmitted.</li>
+      <li><b>Account information:</b> no registration or sign-in; no account or identity data collected.</li>
+      <li><b>Device &amp; logs:</b> no device identifiers; no analytics, advertising, or crash-reporting SDKs.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span> Permissions</h2>
+    <p>The App <b>declares no static sensitive permissions</b>. The following capabilities are triggered on demand via system pickers or secure controls, with minimal, system-managed scope:</p>
+    <table>
+      <tr><th>Capability</th><th>Mechanism</th><th>Purpose</th><th>Static permission</th></tr>
+      <tr><td>Pick photo</td><td>System image picker</td><td>Choose a photo from your album</td><td class="ok">No</td></tr>
+      <tr><td>Take photo</td><td>System secure camera control</td><td>Capture a photo to process</td><td class="ok">No</td></tr>
+      <tr><td>Save to album</td><td>Secure SaveButton (one-time grant)</td><td>Save the processed image</td><td class="ok">No</td></tr>
+      <tr><td>Share</td><td>System share sheet</td><td>Share the image to an app you choose</td><td class="ok">No</td></tr>
+    </table>
+    <p class="note">All actions are initiated by you; the App does not access your album, camera, or files silently in the background.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">3</span> Storage &amp; Protection</h2>
+    <ul>
+      <li><b>Local settings:</b> preferences (default mask mode, emoji list, theme, font paths) are stored only on-device (system Preferences).</li>
+      <li><b>Temporary files:</b> for Share, the processed image is written to the App cache; a temporary file removable by clearing the cache.</li>
+      <li><b>Custom fonts:</b> imported fonts are copied to the App's private sandbox, used only for mask text rendering, and can be deleted in Settings.</li>
+    </ul>
+    <p>None of this data leaves your device. Uninstalling the App removes its private data.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">4</span> Sharing, Transfer &amp; Disclosure</h2>
+    <p>The App <b>does not provide, share, transfer, or publicly disclose</b> your personal information to any third party, because it collects none. When you use Share, the destination is entirely determined by your choice in the system share sheet.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">5</span> Third-Party SDKs</h2>
+    <p>The App <b>integrates no third-party data-collection SDKs</b> (analytics, advertising, push, social). Capabilities such as face detection use built-in HarmonyOS system services (Core Vision Kit) running on-device, with no third-party data transfer.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">6</span> Children's Privacy</h2>
+    <p>The App targets general users, is not directed at children, and collects no personal information. Minors should use it under guardian guidance. Guardians with questions may contact us below.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">7</span> Your Rights</h2>
+    <p>Since the App collects no personal information, there is no personal data to access, correct, delete, or de-register. For locally stored settings and files, you may at any time edit or remove preferences/emoji/fonts in Settings, clear the App cache, or uninstall the App to erase all local data.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">8</span> Updates to This Policy</h2>
+    <p>We may update this policy from time to time. Updates will be reflected in the "Effective date" above and announced via release notes or in-app notice. Please review periodically.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">9</span> Contact Us</h2>
+    <ul>
+      <li>Developer: 【Developer/Company name】</li>
+      <li>Email: 【Contact email, e.g. privacy@example.com】</li>
+      <li>Source &amp; feedback: <a href="https://github.com/LZZLHY/skipface">github.com/LZZLHY/skipface</a></li>
+    </ul>
+  </div>
+
+  <footer>© 2026 SkipFace · Processed entirely on-device, private by design</footer>
+</div>
+</body>
+</html>

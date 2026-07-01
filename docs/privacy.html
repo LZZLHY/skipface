@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SkipFace 隐私政策</title>
+<style>
+  :root{
+    --brand:#5B6CFF; --brand-soft:#ECEEFF; --brand-deep:#3D4ED6;
+    --bg:#F5F6F8; --surface:#FFFFFF; --text:#1A1C1E; --text-2:#6A7078;
+    --divider:#E8EAED; --accent:#19B36B; --radius:16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#7C8AFF; --brand-soft:#23264D; --brand-deep:#AAB4FF;
+      --bg:#121316; --surface:#1E2024; --text:#ECECEC; --text-2:#9AA0A8; --divider:#2A2D32; }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"HarmonyOS Sans","Segoe UI",Roboto,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.75; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:820px; margin:0 auto; padding:32px 20px 72px; }
+  header{ text-align:center; padding:28px 0 8px; }
+  .logo{ width:76px; height:76px; border-radius:20px; box-shadow:0 8px 24px rgba(91,108,255,.28); }
+  h1{ font-size:26px; margin:16px 0 4px; }
+  .sub{ color:var(--text-2); font-size:14px; }
+  .lang{ margin-top:14px; font-size:14px; }
+  .lang a{ color:var(--brand); text-decoration:none; }
+  .badge{ display:inline-block; background:var(--brand-soft); color:var(--brand-deep);
+    border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; margin-top:14px; }
+  .card{ background:var(--surface); border:1px solid var(--divider); border-radius:var(--radius);
+    padding:20px 22px; margin:18px 0; }
+  .card h2{ font-size:18px; margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+  .card h2 .n{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
+    background:var(--brand); color:#fff; border-radius:8px; font-size:14px; }
+  .lead{ background:linear-gradient(135deg,var(--brand),var(--brand-deep)); color:#fff;
+    border:none; }
+  .lead strong{ font-weight:700; }
+  p{ margin:8px 0; }
+  ul{ margin:8px 0; padding-left:20px; }
+  li{ margin:4px 0; }
+  table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:14px; }
+  th,td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--divider); vertical-align:top; }
+  th{ color:var(--text-2); font-weight:600; }
+  .ok{ color:var(--accent); font-weight:700; }
+  a{ color:var(--brand); }
+  .note{ font-size:13px; color:var(--text-2); }
+  footer{ text-align:center; color:var(--text-2); font-size:13px; margin-top:28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="logo" src="assets/logo-rounded.png" alt="SkipFace" />
+    <h1>SkipFace · 隐匿 — 隐私政策</h1>
+    <div class="sub">生效日期：2026-07-01 · 版本 v1.0</div>
+    <div class="lang">简体中文 · <a href="privacy-en.html">English</a></div>
+    <div class="badge">🔒 零收集 · 纯本地离线</div>
+  </header>
+
+  <div class="card lead">
+    <p><strong>一句话概括：</strong>本应用不收集、不存储、不上传你的任何个人信息，全部处理均在你的设备本地完成，且未申请任何敏感权限的静态授权。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">·</span> 引言</h2>
+    <p>SkipFace（以下简称“本应用”）是一款隐私优先、纯本地运行的照片人脸遮挡工具。开发者【请填写：开发者/公司名称】非常重视你的个人信息与隐私保护。本政策说明本应用如何处理与保护你的信息，请在使用前仔细阅读。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">1</span> 我们收集的个人信息</h2>
+    <p><span class="ok">本应用不收集任何个人信息</span>，也不会将你的照片、人脸数据或使用记录上传至任何服务器或第三方。</p>
+    <ul>
+      <li><b>照片内容：</b>你选择或拍摄的照片仅在本机内存/本地缓存中用于遮挡处理，不上传、不共享。</li>
+      <li><b>人脸识别数据：</b>由 HarmonyOS 系统能力（Core Vision Kit）在设备本地完成，仅用于当前编辑会话中定位遮挡，处理后不持久保存、不外传。</li>
+      <li><b>账号信息：</b>无需注册与登录，不收集任何账号或身份信息。</li>
+      <li><b>设备与日志：</b>不收集设备标识符，不接入统计、广告或崩溃上报的第三方 SDK。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span> 权限调用说明</h2>
+    <p>本应用<b>未在应用包中静态声明任何敏感权限</b>。以下能力均通过系统选择器或安全控件按需触发，授权范围最小、由系统管理：</p>
+    <table>
+      <tr><th>能力</th><th>实现方式</th><th>用途</th><th>需静态权限</th></tr>
+      <tr><td>选择照片</td><td>系统图片选择器</td><td>从相册选择待处理照片</td><td class="ok">否</td></tr>
+      <tr><td>拍摄照片</td><td>系统安全相机控件</td><td>现场拍摄待处理照片</td><td class="ok">否</td></tr>
+      <tr><td>保存到相册</td><td>SaveButton 安全控件（一次性授权）</td><td>保存处理后的图片</td><td class="ok">否</td></tr>
+      <tr><td>分享</td><td>系统分享面板</td><td>将图片分享到你选择的应用</td><td class="ok">否</td></tr>
+    </table>
+    <p class="note">上述操作均由你主动发起，本应用不会在后台静默访问相册、相机或文件。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">3</span> 信息的存储与保护</h2>
+    <ul>
+      <li><b>本地设置：</b>偏好（默认遮挡模式、Emoji 列表、主题、字体路径等）仅保存在设备本地（系统 Preferences）。</li>
+      <li><b>临时文件：</b>使用“分享”时，处理后的图片写入应用本地缓存供系统分享，属临时文件，可清理缓存删除。</li>
+      <li><b>自定义字体：</b>导入的字体复制到应用私有沙箱，仅用于遮挡文字渲染，可在设置中删除。</li>
+    </ul>
+    <p>以上数据均不离开你的设备。卸载本应用即会清除应用私有数据。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">4</span> 对外提供、共享、转让与公开披露</h2>
+    <p>本应用<b>不向任何第三方提供、共享、转让或公开披露</b>你的个人信息，因为本应用不收集此类信息。你主动使用“分享”功能时，图片去向完全由你在系统分享面板中的选择决定，与开发者无关。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">5</span> 第三方 SDK</h2>
+    <p>本应用<b>未集成任何第三方数据收集类 SDK</b>（含统计、广告、推送、社交）。人脸检测等能力使用 HarmonyOS 系统自带服务（Core Vision Kit），在设备本地运行，不涉及第三方数据传输。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">6</span> 未成年人保护</h2>
+    <p>本应用面向一般用户，不专门面向未成年人，且不收集任何个人信息。未成年人建议在监护人指导下使用。监护人如有疑问可通过下方方式联系我们。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">7</span> 你的权利</h2>
+    <p>由于本应用不收集个人信息，不涉及个人信息的查询、更正、删除或账号注销。对于本地存储的设置与文件，你可随时：在应用“设置”中修改或删除偏好/Emoji/字体；在系统中清理应用缓存；卸载应用以清除全部本地数据。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">8</span> 本政策的更新</h2>
+    <p>我们可能适时更新本政策，更新后将在本页更新“生效日期”并通过版本说明或应用内提示告知，请定期查阅。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">9</span> 联系我们</h2>
+    <ul>
+      <li>开发者：【请填写：开发者/公司名称】</li>
+      <li>邮箱：【请填写：联系邮箱，例如 privacy@example.com】</li>
+      <li>源码与反馈：<a href="https://github.com/LZZLHY/skipface">github.com/LZZLHY/skipface</a></li>
+    </ul>
+  </div>
+
+  <footer>© 2026 SkipFace · 全程本地处理，隐私由设计保障</footer>
+</div>
+</body>
+</html>
