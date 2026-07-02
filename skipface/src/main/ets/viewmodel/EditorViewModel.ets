@@ -170,12 +170,19 @@ export class EditorViewModel {
     const queue: RegionTask[] = [{ x: 0, y: 0, w: ow, h: oh, depth: 0 }];
     while (queue.length > 0 && budget.calls < AppConstants.DETECT_MAX_CALLS) {
       const t: RegionTask = queue.shift() as RegionTask;
-      const count: number = await this.detectOneRegion(uri, t.x, t.y, t.w, t.h, t.depth, out, budget);
+      const faces: FaceDetection[] = await this.detectOneRegion(uri, t.x, t.y, t.w, t.h, t.depth, budget);
       const canSplit: boolean =
         t.depth < AppConstants.DETECT_MAX_DEPTH && Math.min(t.w, t.h) > AppConstants.DETECT_MIN_SPLIT;
-      if (count >= AppConstants.DETECT_SUBDIVIDE_THRESHOLD && canSplit) {
+      if (faces.length >= AppConstants.DETECT_SUBDIVIDE_THRESHOLD && canSplit) {
+        // 该块被判为"拥挤且被截断" → 交给子块以更大(升采样)尺度重测，丢弃本块的粗结果，
+        // 避免同一张脸在多个尺度被重复检测(污染去重)。
         for (const q of EditorViewModel.computeQuads(t, ow, oh)) {
           queue.push(q);
+        }
+      } else {
+        // 叶子块(不再细分)：其检测结果是该区域的最终结果，累加。
+        for (const d of faces) {
+          out.push(d);
         }
       }
     }
@@ -195,17 +202,17 @@ export class EditorViewModel {
   }
 
   /**
-   * 检测单个原图矩形区域，把结果(映射回原图坐标)累加到 out，返回该块检出的人脸数。
+   * 检测单个原图矩形区域，返回映射回原图坐标的人脸列表(不直接写入结果，由调用方按叶子决定)。
    * 大区域按 REGION_MAX 降采样，小区域升采样到 UPSCALE_TO(放大小脸、越过系统最小尺寸限制)。
    * @param rx/ry/rw/rh 区域(原图坐标)。
    */
   private async detectOneRegion(
     uri: string, rx: number, ry: number, rw: number, rh: number,
-    depth: number, out: FaceDetection[], budget: DetectBudget
-  ): Promise<number> {
+    depth: number, budget: DetectBudget
+  ): Promise<FaceDetection[]> {
     // 退化区域(原生短边过小)：升采样也无意义，跳过。
     if (depth > 0 && Math.min(rw, rh) < AppConstants.DETECT_MIN_NATIVE) {
-      return 0;
+      return [];
     }
     const nativeLong: number = Math.max(rw, rh);
     let scale: number = 1;
@@ -238,10 +245,11 @@ export class EditorViewModel {
     // 解码区域坐标 → 原图坐标：加区域原点 + 乘回缩放系数。
     const sx: number = dw > 0 ? rw / dw : 1;
     const sy: number = dh > 0 ? rh / dh : 1;
+    const mapped: FaceDetection[] = [];
     for (const d of faces) {
-      out.push(EditorViewModel.mapDetection(d, rx, ry, sx, sy));
+      mapped.push(EditorViewModel.mapDetection(d, rx, ry, sx, sy));
     }
-    return faces.length;
+    return mapped;
   }
 
   /** 把一个区域切成四个带重叠、并裁剪到图内的子块任务(深度+1)。 */
