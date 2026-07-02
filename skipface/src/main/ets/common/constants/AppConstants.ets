@@ -19,6 +19,13 @@ export class AppConstants {
    * 反复细分直到某块不足阈值，最后合并 + NMS 去重，用"多次调用"突破"单次数量上限"。
    */
   static readonly DETECT_SUBDIVIDE_THRESHOLD: number = 8;
+  /** 网格块边长 = 人脸中位边长 × 该系数(令每块人脸数远低于单次上限，约 ≤6)。 */
+  static readonly DETECT_TILE_FACE_SPAN: number = 3.5;
+  /** 网格块边长下限/上限(原图像素)。下限配合升采样，上限防止大图块内人脸仍超上限。 */
+  static readonly DETECT_TILE_MIN: number = 240;
+  static readonly DETECT_TILE_MAX: number = 1400;
+  /** 网格块仍被截断(返回数≥该值)时，再切四块补测的触发阈值。 */
+  static readonly DETECT_GRID_SUBDIVIDE: number = 10;
   /** 细分最大深度(仅密集块才会逐层展开；配合升采样可切到很细的区域)。 */
   static readonly DETECT_MAX_DEPTH: number = 5;
   /** 允许继续细分的最小区域边长(原图像素)：低于此值不再切。 */

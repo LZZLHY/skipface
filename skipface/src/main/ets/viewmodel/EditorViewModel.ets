@@ -141,10 +141,14 @@ export class EditorViewModel {
   }
 
   /**
-   * 自适应细分人脸检测：系统检测器每次调用最多约返回 10 张脸；若某区域一次调用返回数
-   * 达到阈值(说明被截断)，就把该区域切成带重叠的四块分别再检测，反复细分至不足阈值，
-   * 最后把所有区域结果映射回原图坐标并 NMS 去重，用"多次调用"突破"单次数量上限"。
-   * @returns 代理图坐标系下的检测结果；发生意外错误(无任何成功调用且无结果)返回 null。
+   * 均匀网格人脸检测(突破系统检测器"单次约 10 张"的上限)：
+   *   1) 先整图检测一次：稀疏(不足阈值)则直接返回；同时用结果估计人脸尺寸；
+   *   2) 据人脸尺寸算出一张均匀网格，使每块内人脸数远低于上限；
+   *   3) 逐块检测(带重叠、小块升采样放大小脸)，每块结果都采纳；
+   *   4) 个别仍被截断(返回≥上限)的密块，再切四块补测；
+   *   5) 汇总后按"中心距"去重(可靠区分相邻不同脸与同一张脸的重复)。
+   * 相比递归四叉树：覆盖均匀、次数有界、每张脸仅被测 1~4 次，去重稳定。
+   * @returns 代理图坐标系检测结果；意外错误(无任何成功调用且无结果)返回 null。
    */
   private async detectAllFaces(uri: string, loaded: LoadedImage): Promise<FaceDetection[] | null> {
     let ow: number = 0;
@@ -163,42 +167,105 @@ export class EditorViewModel {
       return r.ok && r.value ? r.value : null;
     }
 
-    const out: FaceDetection[] = [];
     const budget: DetectBudget = { calls: 0, anyOk: false };
-    // 广度优先(逐层)遍历：先检测所有一级块，再二级……使调用预算在整幅图上公平分配，
-    // 即使用满预算也是均匀的粗覆盖，避免"深度优先把预算耗在左上角、右/下半边空白"的问题。
-    const queue: RegionTask[] = [{ x: 0, y: 0, w: ow, h: oh, depth: 0 }];
-    while (queue.length > 0 && budget.calls < AppConstants.DETECT_MAX_CALLS) {
-      const t: RegionTask = queue.shift() as RegionTask;
-      const faces: FaceDetection[] = await this.detectOneRegion(uri, t.x, t.y, t.w, t.h, t.depth, budget);
-      const canSplit: boolean =
-        t.depth < AppConstants.DETECT_MAX_DEPTH && Math.min(t.w, t.h) > AppConstants.DETECT_MIN_SPLIT;
-      if (faces.length >= AppConstants.DETECT_SUBDIVIDE_THRESHOLD && canSplit) {
-        // 该块被判为"拥挤且被截断" → 交给子块以更大(升采样)尺度重测，丢弃本块的粗结果，
-        // 避免同一张脸在多个尺度被重复检测(污染去重)。
-        for (const q of EditorViewModel.computeQuads(t, ow, oh)) {
-          queue.push(q);
+    const all: FaceDetection[] = [];
+
+    // 1) 整图检测：估计人脸尺寸；稀疏则直接结束。
+    const whole: FaceDetection[] = await this.detectOneRegion(uri, 0, 0, ow, oh, 0, budget);
+    for (const d of whole) {
+      all.push(d);
+    }
+    if (whole.length < AppConstants.DETECT_SUBDIVIDE_THRESHOLD) {
+      // 未被截断(人不多)：整图结果即最终结果。
+      return this.finalizeDetections(all, ow, oh, loaded, budget);
+    }
+
+    // 2) 由整图结果估计人脸平均边长，算出网格块尺寸(令每块人脸数远低于上限)。
+    const fs: number = EditorViewModel.medianFaceSize(whole);
+    const tile: number = Math.max(
+      AppConstants.DETECT_TILE_MIN,
+      Math.min(AppConstants.DETECT_TILE_MAX, Math.round(fs * AppConstants.DETECT_TILE_FACE_SPAN))
+    );
+    const overlap: number = AppConstants.DETECT_SPLIT_OVERLAP;
+    const step: number = Math.max(1, Math.round(tile * (1 - overlap)));
+    const xs: number[] = EditorViewModel.axisStarts(ow, tile, step);
+    const ys: number[] = EditorViewModel.axisStarts(oh, tile, step);
+
+    // 3) 逐块检测；4) 个别仍被截断的密块再切四块补测。
+    for (const gy of ys) {
+      for (const gx of xs) {
+        if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
+          break;
         }
-      } else {
-        // 叶子块(不再细分)：其检测结果是该区域的最终结果，累加。
+        const tw: number = Math.min(tile, ow - gx);
+        const th: number = Math.min(tile, oh - gy);
+        const faces: FaceDetection[] = await this.detectOneRegion(uri, gx, gy, tw, th, 1, budget);
         for (const d of faces) {
-          out.push(d);
+          all.push(d);
+        }
+        if (faces.length >= AppConstants.DETECT_GRID_SUBDIVIDE &&
+          Math.min(tw, th) > AppConstants.DETECT_MIN_SPLIT) {
+          const quads: RegionTask[] =
+            EditorViewModel.computeQuads({ x: gx, y: gy, w: tw, h: th, depth: 1 }, ow, oh);
+          for (const q of quads) {
+            if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
+              break;
+            }
+            const sub: FaceDetection[] = await this.detectOneRegion(uri, q.x, q.y, q.w, q.h, 2, budget);
+            for (const d of sub) {
+              all.push(d);
+            }
+          }
         }
       }
     }
 
-    // 无任何成功调用且无结果：视为检测异常(与"检测到 0 张"区分)。
-    if (out.length === 0 && !budget.anyOk) {
+    return this.finalizeDetections(all, ow, oh, loaded, budget);
+  }
+
+  /** 汇总收尾：异常判定 → 中心距去重 → 映射到代理图坐标；打印诊断日志。 */
+  private finalizeDetections(
+    all: FaceDetection[], ow: number, oh: number, loaded: LoadedImage, budget: DetectBudget
+  ): FaceDetection[] | null {
+    if (all.length === 0 && !budget.anyOk) {
       return null;
     }
-    const merged: FaceDetection[] = EditorViewModel.dedupByCenter(out, AppConstants.DETECT_DEDUP_CENTER_FACTOR);
+    const merged: FaceDetection[] = EditorViewModel.dedupByCenter(all, AppConstants.DETECT_DEDUP_CENTER_FACTOR);
     const k: number = ow > 0 ? loaded.proxyWidth / ow : 1;
     Logger.info(EditorViewModel.TAG,
-      `adaptive detect: ${budget.calls} call(s), raw ${out.length} -> merged ${merged.length} face(s), origin ${ow}x${oh}`);
+      `grid detect: ${budget.calls} call(s), raw ${all.length} -> merged ${merged.length} face(s), origin ${ow}x${oh}`);
     if (Math.abs(k - 1) < 1e-3) {
       return merged;
     }
     return merged.map((d: FaceDetection): FaceDetection => EditorViewModel.scaleDetection(d, k));
+  }
+
+  /** 取一组检测结果的人脸平均边长中位数(原图像素)，用于估计网格块尺寸。 */
+  private static medianFaceSize(list: FaceDetection[]): number {
+    if (list.length === 0) {
+      return 96;
+    }
+    const sizes: number[] = list.map((d: FaceDetection): number => (d.box.width + d.box.height) / 2);
+    sizes.sort((a: number, b: number): number => a - b);
+    return sizes[Math.floor(sizes.length / 2)];
+  }
+
+  /** 某一轴的网格起点：等距铺开、最后一块对齐到边缘、去重。 */
+  private static axisStarts(total: number, tile: number, step: number): number[] {
+    if (total <= tile) {
+      return [0];
+    }
+    const starts: number[] = [];
+    let s: number = 0;
+    while (s + tile < total) {
+      starts.push(s);
+      s += step;
+    }
+    const last: number = total - tile;
+    if (starts.length === 0 || starts[starts.length - 1] !== last) {
+      starts.push(last);
+    }
+    return starts;
   }
 
   /**
