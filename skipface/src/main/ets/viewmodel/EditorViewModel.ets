@@ -187,7 +187,7 @@ export class EditorViewModel {
     const merged: FaceDetection[] = EditorViewModel.nms(out, AppConstants.DETECT_DEDUP_IOU);
     const k: number = ow > 0 ? loaded.proxyWidth / ow : 1;
     Logger.info(EditorViewModel.TAG,
-      `adaptive detect: ${budget.calls} call(s), ${merged.length} face(s), origin ${ow}x${oh}`);
+      `adaptive detect: ${budget.calls} call(s), raw ${out.length} -> merged ${merged.length} face(s), origin ${ow}x${oh}`);
     if (Math.abs(k - 1) < 1e-3) {
       return merged;
     }
