@@ -154,59 +154,24 @@ export class PhotoRepository {
   }
 
   /**
-   * 轻量读取原图像素尺寸(不做全分辨率解码)。
-   * @returns 原图宽高(像素)。
+   * 打开一个"区域解码会话"：复用同一个 ImageSource 连续按区域解码多个矩形，
+   * 避免分块人脸检测时每块都重新 openSync + createImageSource 的重复开销。
+   * 用完必须调用 RegionDecoder.close()。
    */
-  async getImageSize(uri: string): Promise<image.Size> {
+  openRegionDecoder(uri: string): RegionDecoder {
     const file: fs.File = fs.openSync(uri, fs.OpenMode.READ_ONLY);
     let source: image.ImageSource | undefined;
     try {
       source = image.createImageSource(file.fd);
-      if (!source) {
-        throw new Error('createImageSource 返回空(无法读取该图片)');
-      }
-      const info: image.ImageInfo = await source.getImageInfo();
-      return info.size;
-    } finally {
-      if (source) {
-        source.release();
-      }
+    } catch (e) {
       fs.closeSync(file.fd);
+      throw e as Error;
     }
-  }
-
-  /**
-   * 按区域解码原图的一个矩形(用于分块人脸检测)。可选把该区域降采样到 outW×outH，
-   * 以在超大图上限制单块内存/耗时；不传 out 尺寸时按原生分辨率解码。
-   * @param x/y/w/h 区域(原图像素坐标)。
-   * @param outW/outH 目标解码尺寸(可选)。
-   * @returns 该区域的 RGBA_8888 PixelMap。
-   */
-  async decodeRegion(
-    uri: string, x: number, y: number, w: number, h: number, outW?: number, outH?: number
-  ): Promise<image.PixelMap> {
-    const file: fs.File = fs.openSync(uri, fs.OpenMode.READ_ONLY);
-    let source: image.ImageSource | undefined;
-    try {
-      source = image.createImageSource(file.fd);
-      if (!source) {
-        throw new Error('createImageSource 返回空(无法读取该图片)');
-      }
-      const options: image.DecodingOptions = {
-        desiredPixelFormat: image.PixelMapFormat.RGBA_8888,
-        editable: true,
-        desiredRegion: { x, y, size: { width: w, height: h } }
-      };
-      if (outW && outH && outW > 0 && outH > 0) {
-        options.desiredSize = { width: outW, height: outH };
-      }
-      return await source.createPixelMap(options);
-    } finally {
-      if (source) {
-        source.release();
-      }
+    if (!source) {
       fs.closeSync(file.fd);
+      throw new Error('createImageSource 返回空(无法读取该图片)');
     }
+    return new RegionDecoder(source, file.fd);
   }
 
   /** 将 PixelMap 编码为 PNG 字节。 */
@@ -289,6 +254,63 @@ export class PhotoRepository {
       selectionMode: systemShare.SelectionMode.SINGLE,
       previewMode: systemShare.SharePreviewMode.DETAIL
     });
+  }
+}
+
+/**
+ * 区域解码会话：持有一个已打开的 ImageSource(及其 fd)，可多次按区域解码，用完 close()。
+ * 用于分块人脸检测，复用同一解码器，避免逐块重复打开文件/构建解码器的开销。
+ */
+export class RegionDecoder {
+  private source: image.ImageSource;
+  private fd: number;
+  private closed: boolean = false;
+
+  constructor(source: image.ImageSource, fd: number) {
+    this.source = source;
+    this.fd = fd;
+  }
+
+  /** 读取原图像素尺寸(不做全分辨率解码)。 */
+  async size(): Promise<image.Size> {
+    const info: image.ImageInfo = await this.source.getImageInfo();
+    return info.size;
+  }
+
+  /**
+   * 按区域解码一个矩形；可选把该区域缩放到 outW×outH(降采样限内存 / 升采样放大小脸)。
+   * @param x/y/w/h 区域(原图像素坐标)。 @param outW/outH 目标解码尺寸(可选)。
+   */
+  async decode(
+    x: number, y: number, w: number, h: number, outW?: number, outH?: number
+  ): Promise<image.PixelMap> {
+    const options: image.DecodingOptions = {
+      desiredPixelFormat: image.PixelMapFormat.RGBA_8888,
+      editable: true,
+      desiredRegion: { x, y, size: { width: w, height: h } }
+    };
+    if (outW && outH && outW > 0 && outH > 0) {
+      options.desiredSize = { width: outW, height: outH };
+    }
+    return this.source.createPixelMap(options);
+  }
+
+  /** 释放 ImageSource 并关闭文件。幂等。 */
+  close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    try {
+      this.source.release();
+    } catch (e) {
+      // 忽略释放异常。
+    }
+    try {
+      fs.closeSync(this.fd);
+    } catch (e) {
+      // 忽略关闭异常。
+    }
   }
 }
 

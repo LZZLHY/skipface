@@ -19,7 +19,9 @@ export class AppConstants {
    * 反复细分直到某块不足阈值，最后合并 + NMS 去重，用"多次调用"突破"单次数量上限"。
    */
   static readonly DETECT_SUBDIVIDE_THRESHOLD: number = 8;
-  /** 网格块边长 = 人脸中位边长 × 该系数(令每块人脸数远低于单次上限，约 ≤6)。 */
+  /** 估计人脸边长时使用的分位数(0~1)：取偏小分位使网格块略小、每块脸更少。 */
+  static readonly DETECT_FACE_SIZE_PCT: number = 0.4;
+  /** 网格块边长 = 人脸边长(偏小分位) × 该系数(令每块人脸数远低于单次上限，约 ≤6)。 */
   static readonly DETECT_TILE_FACE_SPAN: number = 3.5;
   /** 网格块边长下限/上限(原图像素)。下限配合升采样，上限防止大图块内人脸仍超上限。 */
   static readonly DETECT_TILE_MIN: number = 240;

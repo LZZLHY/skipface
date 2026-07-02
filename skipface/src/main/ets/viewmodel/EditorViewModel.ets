@@ -15,6 +15,7 @@ import { LoadedImage } from '../domain/model/LoadedImage';
 import { FaceDetection, FaceLandmarks } from '../domain/model/FaceDetection';
 import { EmojiMask, BlurMask } from '../domain/model/Mask';
 import { RectF, PointF } from '../domain/model/Geometry';
+import { RegionDecoder } from '../data/photo/PhotoRepository';
 import { MaskKind, BlurEffect, BlurTarget } from '../domain/model/MaskEnums';
 import { ExportRequest } from '../capability/imaging/ImageExporter';
 import { Result } from '../common/base/Result';
@@ -151,76 +152,91 @@ export class EditorViewModel {
    * @returns 代理图坐标系检测结果；意外错误(无任何成功调用且无结果)返回 null。
    */
   private async detectAllFaces(uri: string, loaded: LoadedImage): Promise<FaceDetection[] | null> {
-    let ow: number = 0;
-    let oh: number = 0;
+    // 打开一个可复用的区域解码会话：整图+所有网格块共用同一 ImageSource，
+    // 避免逐块重复 openSync/createImageSource 的开销(密集图能省几十次)。
+    let decoder: RegionDecoder | null = null;
     try {
-      const size: image.Size = await this.container.photoRepo.getImageSize(uri);
-      ow = size.width;
-      oh = size.height;
+      decoder = this.container.photoRepo.openRegionDecoder(uri);
     } catch (e) {
-      Logger.warn(EditorViewModel.TAG, 'get image size failed, fallback to proxy detect');
-      const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(loaded.proxy);
-      return r.ok && r.value ? r.value : null;
-    }
-    if (ow <= 0 || oh <= 0) {
+      Logger.warn(EditorViewModel.TAG, 'open region decoder failed, fallback to proxy detect');
       const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(loaded.proxy);
       return r.ok && r.value ? r.value : null;
     }
 
-    const budget: DetectBudget = { calls: 0, anyOk: false };
-    const all: FaceDetection[] = [];
+    try {
+      let ow: number = 0;
+      let oh: number = 0;
+      try {
+        const size: image.Size = await decoder.size();
+        ow = size.width;
+        oh = size.height;
+      } catch (e) {
+        Logger.warn(EditorViewModel.TAG, 'get image size failed, fallback to proxy detect');
+        const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(loaded.proxy);
+        return r.ok && r.value ? r.value : null;
+      }
+      if (ow <= 0 || oh <= 0) {
+        const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(loaded.proxy);
+        return r.ok && r.value ? r.value : null;
+      }
 
-    // 1) 整图检测：估计人脸尺寸；稀疏则直接结束。
-    const whole: FaceDetection[] = await this.detectOneRegion(uri, 0, 0, ow, oh, 0, budget);
-    for (const d of whole) {
-      all.push(d);
-    }
-    if (whole.length < AppConstants.DETECT_SUBDIVIDE_THRESHOLD) {
-      // 未被截断(人不多)：整图结果即最终结果。
-      return this.finalizeDetections(all, ow, oh, loaded, budget);
-    }
+      const budget: DetectBudget = { calls: 0, anyOk: false };
+      const all: FaceDetection[] = [];
 
-    // 2) 由整图结果估计人脸平均边长，算出网格块尺寸(令每块人脸数远低于上限)。
-    const fs: number = EditorViewModel.medianFaceSize(whole);
-    const tile: number = Math.max(
-      AppConstants.DETECT_TILE_MIN,
-      Math.min(AppConstants.DETECT_TILE_MAX, Math.round(fs * AppConstants.DETECT_TILE_FACE_SPAN))
-    );
-    const overlap: number = AppConstants.DETECT_SPLIT_OVERLAP;
-    const step: number = Math.max(1, Math.round(tile * (1 - overlap)));
-    const xs: number[] = EditorViewModel.axisStarts(ow, tile, step);
-    const ys: number[] = EditorViewModel.axisStarts(oh, tile, step);
+      // 1) 整图检测：估计人脸尺寸；稀疏则直接结束。
+      const whole: FaceDetection[] = await this.detectOneRegion(decoder, 0, 0, ow, oh, 0, budget);
+      for (const d of whole) {
+        all.push(d);
+      }
+      if (whole.length < AppConstants.DETECT_SUBDIVIDE_THRESHOLD) {
+        return this.finalizeDetections(all, ow, oh, loaded, budget);
+      }
 
-    // 3) 逐块检测；4) 个别仍被截断的密块再切四块补测。
-    for (const gy of ys) {
-      for (const gx of xs) {
-        if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
-          break;
-        }
-        const tw: number = Math.min(tile, ow - gx);
-        const th: number = Math.min(tile, oh - gy);
-        const faces: FaceDetection[] = await this.detectOneRegion(uri, gx, gy, tw, th, 1, budget);
-        for (const d of faces) {
-          all.push(d);
-        }
-        if (faces.length >= AppConstants.DETECT_GRID_SUBDIVIDE &&
-          Math.min(tw, th) > AppConstants.DETECT_MIN_SPLIT) {
-          const quads: RegionTask[] =
-            EditorViewModel.computeQuads({ x: gx, y: gy, w: tw, h: th, depth: 1 }, ow, oh);
-          for (const q of quads) {
-            if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
-              break;
-            }
-            const sub: FaceDetection[] = await this.detectOneRegion(uri, q.x, q.y, q.w, q.h, 2, budget);
-            for (const d of sub) {
-              all.push(d);
+      // 2) 由整图结果估计人脸边长(取偏小分位，令块略小、每块脸更少、几乎不再触发补测)，
+      //    据此算出网格块尺寸。
+      const fs: number = EditorViewModel.percentileFaceSize(whole, AppConstants.DETECT_FACE_SIZE_PCT);
+      const tile: number = Math.max(
+        AppConstants.DETECT_TILE_MIN,
+        Math.min(AppConstants.DETECT_TILE_MAX, Math.round(fs * AppConstants.DETECT_TILE_FACE_SPAN))
+      );
+      const overlap: number = AppConstants.DETECT_SPLIT_OVERLAP;
+      const step: number = Math.max(1, Math.round(tile * (1 - overlap)));
+      const xs: number[] = EditorViewModel.axisStarts(ow, tile, step);
+      const ys: number[] = EditorViewModel.axisStarts(oh, tile, step);
+
+      // 3) 逐块检测；4) 个别仍被截断的密块再切四块补测。
+      for (const gy of ys) {
+        for (const gx of xs) {
+          if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
+            break;
+          }
+          const tw: number = Math.min(tile, ow - gx);
+          const th: number = Math.min(tile, oh - gy);
+          const faces: FaceDetection[] = await this.detectOneRegion(decoder, gx, gy, tw, th, 1, budget);
+          for (const d of faces) {
+            all.push(d);
+          }
+          if (faces.length >= AppConstants.DETECT_GRID_SUBDIVIDE &&
+            Math.min(tw, th) > AppConstants.DETECT_MIN_SPLIT) {
+            const quads: RegionTask[] =
+              EditorViewModel.computeQuads({ x: gx, y: gy, w: tw, h: th, depth: 1 }, ow, oh);
+            for (const q of quads) {
+              if (budget.calls >= AppConstants.DETECT_MAX_CALLS) {
+                break;
+              }
+              const sub: FaceDetection[] = await this.detectOneRegion(decoder, q.x, q.y, q.w, q.h, 2, budget);
+              for (const d of sub) {
+                all.push(d);
+              }
             }
           }
         }
       }
-    }
 
-    return this.finalizeDetections(all, ow, oh, loaded, budget);
+      return this.finalizeDetections(all, ow, oh, loaded, budget);
+    } finally {
+      decoder.close();
+    }
   }
 
   /** 汇总收尾：异常判定 → 中心距去重 → 映射到代理图坐标；打印诊断日志。 */
@@ -240,14 +256,19 @@ export class EditorViewModel {
     return merged.map((d: FaceDetection): FaceDetection => EditorViewModel.scaleDetection(d, k));
   }
 
-  /** 取一组检测结果的人脸平均边长中位数(原图像素)，用于估计网格块尺寸。 */
-  private static medianFaceSize(list: FaceDetection[]): number {
+  /**
+   * 取一组检测结果人脸平均边长的指定分位数(原图像素)，用于估计网格块尺寸。
+   * 取偏小分位(如 0.4)：块略小、每块脸更少，几乎不再触发密块补测。
+   * @param pct 0~1 分位(0 最小、0.5 中位)。
+   */
+  private static percentileFaceSize(list: FaceDetection[], pct: number): number {
     if (list.length === 0) {
       return 96;
     }
     const sizes: number[] = list.map((d: FaceDetection): number => (d.box.width + d.box.height) / 2);
     sizes.sort((a: number, b: number): number => a - b);
-    return sizes[Math.floor(sizes.length / 2)];
+    const idx: number = Math.min(sizes.length - 1, Math.max(0, Math.floor(sizes.length * pct)));
+    return sizes[idx];
   }
 
   /** 某一轴的网格起点：等距铺开、最后一块对齐到边缘、去重。 */
@@ -274,7 +295,7 @@ export class EditorViewModel {
    * @param rx/ry/rw/rh 区域(原图坐标)。
    */
   private async detectOneRegion(
-    uri: string, rx: number, ry: number, rw: number, rh: number,
+    decoder: RegionDecoder, rx: number, ry: number, rw: number, rh: number,
     depth: number, budget: DetectBudget
   ): Promise<FaceDetection[]> {
     // 退化区域(原生短边过小)：升采样也无意义，跳过。
@@ -295,7 +316,7 @@ export class EditorViewModel {
     let faces: FaceDetection[] = [];
     let pm: image.PixelMap | null = null;
     try {
-      pm = await this.container.photoRepo.decodeRegion(uri, rx, ry, rw, rh, dw, dh);
+      pm = await decoder.decode(rx, ry, rw, rh, dw, dh);
       const r: Result<FaceDetection[]> = await this.container.detectFaces.execute(pm);
       if (r.ok && r.value) {
         budget.anyOk = true;
