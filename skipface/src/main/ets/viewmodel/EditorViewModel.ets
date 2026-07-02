@@ -184,7 +184,7 @@ export class EditorViewModel {
     if (out.length === 0 && !budget.anyOk) {
       return null;
     }
-    const merged: FaceDetection[] = EditorViewModel.nms(out, AppConstants.DETECT_DEDUP_IOU);
+    const merged: FaceDetection[] = EditorViewModel.dedupByCenter(out, AppConstants.DETECT_DEDUP_CENTER_FACTOR);
     const k: number = ow > 0 ? loaded.proxyWidth / ow : 1;
     Logger.info(EditorViewModel.TAG,
       `adaptive detect: ${budget.calls} call(s), raw ${out.length} -> merged ${merged.length} face(s), origin ${ow}x${oh}`);
@@ -276,16 +276,24 @@ export class EditorViewModel {
     return quads;
   }
 
-  /** NMS 去重：按分数降序，IoU 超阈值视为同一张脸，保留分数更高者。 */
-  private static nms(list: FaceDetection[], iouThreshold: number): FaceDetection[] {
+  /**
+   * 基于中心距的去重：按分数降序，若某框中心与已保留框的中心距 < factor×较小平均边长，
+   * 视为同一张脸而丢弃。相比 IoU，能在密集合影中区分"相邻不同脸"与"同一张脸的重复"。
+   */
+  private static dedupByCenter(list: FaceDetection[], factor: number): FaceDetection[] {
     const sorted: FaceDetection[] = list.slice().sort(
       (a: FaceDetection, b: FaceDetection): number => b.score - a.score
     );
     const keep: FaceDetection[] = [];
     for (const d of sorted) {
+      const dcx: number = d.box.centerX;
+      const dcy: number = d.box.centerY;
+      const dSize: number = (d.box.width + d.box.height) / 2;
       let duplicate: boolean = false;
       for (const k of keep) {
-        if (EditorViewModel.iou(d.box, k.box) > iouThreshold) {
+        const kSize: number = (k.box.width + k.box.height) / 2;
+        const dist: number = Math.hypot(dcx - k.box.centerX, dcy - k.box.centerY);
+        if (dist < factor * Math.min(dSize, kSize)) {
           duplicate = true;
           break;
         }
@@ -295,19 +303,6 @@ export class EditorViewModel {
       }
     }
     return keep;
-  }
-
-  /** 两个矩形的 IoU。 */
-  private static iou(a: RectF, b: RectF): number {
-    const x1: number = Math.max(a.left, b.left);
-    const y1: number = Math.max(a.top, b.top);
-    const x2: number = Math.min(a.right, b.right);
-    const y2: number = Math.min(a.bottom, b.bottom);
-    const inter: number = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
-    const areaA: number = Math.max(0, a.width) * Math.max(0, a.height);
-    const areaB: number = Math.max(0, b.width) * Math.max(0, b.height);
-    const union: number = areaA + areaB - inter;
-    return union <= 0 ? 0 : inter / union;
   }
 
   /** 把一次检测结果从"解码区域坐标"映射回"原图坐标"(加区域原点 + 乘降采样系数)。 */

@@ -38,11 +38,12 @@ export class AppConstants {
   /** 单块解码的最大边长(原图像素)：超过则降采样解码，限制内存/耗时。 */
   static readonly DETECT_REGION_MAX: number = 2200;
   /**
-   * 分块结果合并去重的 IoU 阈值：重叠超过该值才视为"同一张脸"合并。
-   * 取较高值(0.6)：重叠瓦片检测到的同一张脸框几乎重合(IoU≈0.8+)会被合并；
-   * 而密集合影里相邻的两张不同的脸只是部分重叠(IoU≈0.3~0.5)，不应被误合并删除。
+   * 分块结果合并去重的"中心距系数"。判定两次检测为同一张脸的条件：
+   *   两框中心距 < 系数 × 两者较小的平均边长。
+   * 用中心距而非 IoU：同一张脸被相邻瓦片各检测一次时两框中心几乎重合(会合并)；
+   * 而密集合影里相邻的两张不同的脸中心相隔约一个脸宽(不会被误合并删除)。取 0.5 较稳。
    */
-  static readonly DETECT_DEDUP_IOU: number = 0.6;
+  static readonly DETECT_DEDUP_CENTER_FACTOR: number = 0.5;
   /** 新增 Emoji 的默认直径（代理图坐标系，像素）。 */
   static readonly DEFAULT_EMOJI_DIAMETER: number = 100;
   /** 新增模糊区域的默认边长（代理图坐标系，像素）。 */
